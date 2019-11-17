@@ -102,11 +102,13 @@ architecture arch of gba_top is
    signal VRAM_Lo_addr         : integer range 0 to 16383;
    signal VRAM_Lo_datain       : std_logic_vector(31 downto 0);
    signal VRAM_Lo_dataout      : std_logic_vector(31 downto 0);
-   signal VRAM_Lo_we           : std_logic_vector(3 downto 0);
+   signal VRAM_Lo_we           : std_logic;
+   signal VRAM_Lo_be           : std_logic_vector(3 downto 0);
    signal VRAM_Hi_addr         : integer range 0 to 8191;
    signal VRAM_Hi_datain       : std_logic_vector(31 downto 0);
    signal VRAM_Hi_dataout      : std_logic_vector(31 downto 0);
-   signal VRAM_Hi_we           : std_logic_vector(3 downto 0);
+   signal VRAM_Hi_we           : std_logic;
+   signal VRAM_Hi_be           : std_logic_vector(3 downto 0);
                                
    signal OAMRAM_PROC_addr     : integer range 0 to 255;
    signal OAMRAM_PROC_datain   : std_logic_vector(31 downto 0);
@@ -312,10 +314,12 @@ begin
       VRAM_Lo_datain       => VRAM_Lo_datain, 
       VRAM_Lo_dataout      => VRAM_Lo_dataout,
       VRAM_Lo_we           => VRAM_Lo_we,     
+      VRAM_Lo_be           => VRAM_Lo_be,     
       VRAM_Hi_addr         => VRAM_Hi_addr,   
       VRAM_Hi_datain       => VRAM_Hi_datain, 
       VRAM_Hi_dataout      => VRAM_Hi_dataout,
       VRAM_Hi_we           => VRAM_Hi_we,     
+      VRAM_Hi_be           => VRAM_Hi_be,     
 
       OAMRAM_PROC_addr     => OAMRAM_PROC_addr,   
       OAMRAM_PROC_datain   => OAMRAM_PROC_datain, 
@@ -380,6 +384,10 @@ begin
    );
    
    igba_gpu : entity work.gba_gpu
+   generic map
+   (
+      is_simu => is_simu
+   )
    port map
    (
       clk100               => clk100,
@@ -405,10 +413,12 @@ begin
       VRAM_Lo_datain       => VRAM_Lo_datain, 
       VRAM_Lo_dataout      => VRAM_Lo_dataout,
       VRAM_Lo_we           => VRAM_Lo_we,     
+      VRAM_Lo_be           => VRAM_Lo_be,     
       VRAM_Hi_addr         => VRAM_Hi_addr,   
       VRAM_Hi_datain       => VRAM_Hi_datain, 
       VRAM_Hi_dataout      => VRAM_Hi_dataout,
       VRAM_Hi_we           => VRAM_Hi_we,        
+      VRAM_Hi_be           => VRAM_Hi_be,        
                          
       OAMRAM_PROC_addr     => OAMRAM_PROC_addr,   
       OAMRAM_PROC_datain   => OAMRAM_PROC_datain, 
@@ -428,6 +438,10 @@ begin
    );
    
    igba_timer : entity work.gba_timer
+   generic map
+   (
+      is_simu => is_simu
+   )
    port map
    (
       clk100           => clk100,

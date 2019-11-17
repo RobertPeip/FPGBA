@@ -58,11 +58,13 @@ entity gba_memorymux is
       VRAM_Lo_addr         : out   integer range 0 to 16383;
       VRAM_Lo_datain       : out   std_logic_vector(31 downto 0);
       VRAM_Lo_dataout      : in    std_logic_vector(31 downto 0);
-      VRAM_Lo_we           : out   std_logic_vector(3 downto 0);
+      VRAM_Lo_we           : out   std_logic;
+      VRAM_Lo_be           : out   std_logic_vector(3 downto 0);
       VRAM_Hi_addr         : out   integer range 0 to 8191;
       VRAM_Hi_datain       : out   std_logic_vector(31 downto 0);
       VRAM_Hi_dataout      : in    std_logic_vector(31 downto 0);
-      VRAM_Hi_we           : out   std_logic_vector(3 downto 0);
+      VRAM_Hi_we           : out   std_logic;
+      VRAM_Hi_be           : out   std_logic_vector(3 downto 0);
                            
       OAMRAM_PROC_addr     : out   integer range 0 to 255;
       OAMRAM_PROC_datain   : out   std_logic_vector(31 downto 0);
@@ -241,7 +243,7 @@ begin
    
    process (clk100)
       variable palette_we : std_logic_vector(3 downto 0);
-      variable VRAM_we    : std_logic_vector(3 downto 0);
+      variable VRAM_be    : std_logic_vector(3 downto 0);
    begin
       if rising_edge(clk100) then
       
@@ -280,8 +282,8 @@ begin
          gb_bus_out.rst   <= not gb_on and gb_on_1;
          
          smallram_we     <= (others => '0');
-         VRAM_Hi_we      <= (others => '0');
-         VRAM_Lo_we      <= (others => '0');
+         VRAM_Hi_we      <= '0';
+         VRAM_Lo_we      <= '0';
          OAMRAM_PROC_we  <= (others => '0');
          PALETTE_BG_we   <= (others => '0');
          PALETTE_OAM_we  <= (others => '0');
@@ -761,32 +763,34 @@ begin
                   VRAM_Lo_datain(15 downto 8) <= rotate_writedata(7 downto 0);
                end if;
                state <= IDLE;
-               VRAM_we := (others => '0');
+               VRAM_be := (others => '0');
                if (acc_save = ACCESS_8BIT) then
                   -- if ((GPU.videomode <= 2 && adr <= 0xFFFF) || GPU.videomode >= 3 && adr <= 0x013FFF)
                   -- {
                   case(adr_save(1 downto 0)) is
-                     when "00" => VRAM_we(0) := '1'; VRAM_we(1) := '1';
-                     when "01" => VRAM_we(1) := '1'; VRAM_we(0) := '1';
-                     when "10" => VRAM_we(2) := '1'; VRAM_we(3) := '1';
-                     when "11" => VRAM_we(3) := '1'; VRAM_we(2) := '1';
+                     when "00" => VRAM_be(0) := '1'; VRAM_be(1) := '1';
+                     when "01" => VRAM_be(1) := '1'; VRAM_be(0) := '1';
+                     when "10" => VRAM_be(2) := '1'; VRAM_be(3) := '1';
+                     when "11" => VRAM_be(3) := '1'; VRAM_be(2) := '1';
                      when others => null;
                   end case;
                elsif (acc_save = ACCESS_16BIT) then
                   if (adr_save(1) = '1') then
-                     VRAM_we(2) := '1';
-                     VRAM_we(3) := '1';
+                     VRAM_be(2) := '1';
+                     VRAM_be(3) := '1';
                   else                                                               
-                     VRAM_we(0) := '1';
-                     VRAM_we(1) := '1';
+                     VRAM_be(0) := '1';
+                     VRAM_be(1) := '1';
                   end if;
                else
-                  VRAM_we := (others => '1');
+                  VRAM_be := (others => '1');
                end if;
+               VRAM_Hi_be <= VRAM_be;
+               VRAM_Lo_be <= VRAM_be;
                if (adr_save(16) = '1') then
-                  VRAM_Hi_we <= VRAM_we;
+                  VRAM_Hi_we <= '1';
                else
-                  VRAM_Lo_we <= VRAM_we;
+                  VRAM_Lo_we <= '1';
                end if;
                
             when WRITE_OAM =>

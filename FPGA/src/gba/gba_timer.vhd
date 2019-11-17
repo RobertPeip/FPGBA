@@ -6,6 +6,10 @@ use work.pProc_bus_gba.all;
 use work.pReg_gba_timer.all;
 
 entity gba_timer is
+   generic
+   (
+      is_simu : std_logic
+   );
    port 
    (
       clk100           : in    std_logic;  
@@ -37,6 +41,7 @@ begin
    igba_timer_module0 : entity work.gba_timer_module
    generic map
    (
+      is_simu                => is_simu,
       Reg_L                  => TM0CNT_L,
       Reg_H_Prescaler        => TM0CNT_H_Prescaler       ,
       Reg_H_Count_up         => TM0CNT_H_Count_up        ,
@@ -62,6 +67,7 @@ begin
    igba_timer_module1 : entity work.gba_timer_module
    generic map
    (
+      is_simu                => is_simu,
       Reg_L                  => TM1CNT_L,
       Reg_H_Prescaler        => TM1CNT_H_Prescaler       ,
       Reg_H_Count_up         => TM1CNT_H_Count_up        ,
@@ -87,6 +93,7 @@ begin
    igba_timer_module2 : entity work.gba_timer_module
    generic map
    (
+      is_simu                => is_simu,
       Reg_L                  => TM2CNT_L,
       Reg_H_Prescaler        => TM2CNT_H_Prescaler       ,
       Reg_H_Count_up         => TM2CNT_H_Count_up        ,
@@ -112,6 +119,7 @@ begin
    igba_timer_module3 : entity work.gba_timer_module
    generic map
    (
+      is_simu                => is_simu,
       Reg_L                  => TM3CNT_L,
       Reg_H_Prescaler        => TM3CNT_H_Prescaler       ,
       Reg_H_Count_up         => TM3CNT_H_Count_up        ,

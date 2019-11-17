@@ -8,6 +8,7 @@ use work.pProc_bus_gba.all;
 entity gba_timer_module is
    generic
    (
+      is_simu                : std_logic;
       Reg_L                  : regmap_type;
       Reg_H_Prescaler        : regmap_type;
       Reg_H_Count_up         : regmap_type;
@@ -64,10 +65,8 @@ begin
       
          tick      <= '0';
          IRP_Timer <= '0';
-         
 
-         
-         if (gb_on = '0') then -- reset
+         if (gb_on = '0' and is_simu = '0') then -- reset
       
             timer_on         <= '0';
             counter          <= (others => '0');

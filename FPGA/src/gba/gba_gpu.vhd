@@ -8,6 +8,10 @@ use work.pProc_bus_gba.all;
 use work.pReg_gba_display.all;
 
 entity gba_gpu is
+   generic
+   (
+      is_simu : std_logic
+   );
    port 
    (
       clk100               : in    std_logic;  
@@ -32,11 +36,13 @@ entity gba_gpu is
       VRAM_Lo_addr         : in    integer range 0 to 16383;
       VRAM_Lo_datain       : in    std_logic_vector(31 downto 0);
       VRAM_Lo_dataout      : out   std_logic_vector(31 downto 0);
-      VRAM_Lo_we           : in    std_logic_vector(3 downto 0);
+      VRAM_Lo_we           : in    std_logic;
+      VRAM_Lo_be           : in    std_logic_vector(3 downto 0);
       VRAM_Hi_addr         : in    integer range 0 to 8191;
       VRAM_Hi_datain       : in    std_logic_vector(31 downto 0);
       VRAM_Hi_dataout      : out   std_logic_vector(31 downto 0);
-      VRAM_Hi_we           : in    std_logic_vector(3 downto 0);
+      VRAM_Hi_we           : in    std_logic;
+      VRAM_Hi_be           : in    std_logic_vector(3 downto 0);
                            
       OAMRAM_PROC_addr     : in    integer range 0 to 255;
       OAMRAM_PROC_datain   : in    std_logic_vector(31 downto 0);
@@ -67,6 +73,10 @@ architecture arch of gba_gpu is
 begin 
 
    igba_gpu_timing : entity work.gba_gpu_timing
+   generic map
+   (
+      is_simu => is_simu
+   )
    port map
    (
       clk100                       => clk100,
@@ -91,6 +101,10 @@ begin
    );
 
    igba_gpu_drawer : entity work.gba_gpu_drawer
+   generic map
+   (
+      is_simu => is_simu
+   )
    port map
    (
       clk100                 => clk100,
@@ -111,10 +125,12 @@ begin
       VRAM_Lo_datain         => VRAM_Lo_datain, 
       VRAM_Lo_dataout        => VRAM_Lo_dataout,
       VRAM_Lo_we             => VRAM_Lo_we,     
+      VRAM_Lo_be             => VRAM_Lo_be,     
       VRAM_Hi_addr           => VRAM_Hi_addr,   
       VRAM_Hi_datain         => VRAM_Hi_datain, 
       VRAM_Hi_dataout        => VRAM_Hi_dataout,
       VRAM_Hi_we             => VRAM_Hi_we,           
+      VRAM_Hi_be             => VRAM_Hi_be,           
                                                 
       OAMRAM_PROC_addr       => OAMRAM_PROC_addr,    
       OAMRAM_PROC_datain     => OAMRAM_PROC_datain,  

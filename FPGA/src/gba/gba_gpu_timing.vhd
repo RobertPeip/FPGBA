@@ -6,6 +6,10 @@ use work.pProc_bus_gba.all;
 use work.pReg_gba_display.all;
 
 entity gba_gpu_timing is
+   generic
+   (
+      is_simu : std_logic
+   );
    port 
    (
       clk100                       : in  std_logic;  
@@ -91,7 +95,7 @@ begin
          hblank_trigger    <= '0';
          vblank_trigger    <= '0';
          
-         if (gb_on = '0') then
+         if (gb_on = '0' and is_simu = '0') then
             gpustate    <= VISIBLE;
             cycles      <= (others => '0');
             linecounter <= (others => '0');

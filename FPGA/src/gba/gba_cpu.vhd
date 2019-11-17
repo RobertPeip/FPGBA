@@ -526,6 +526,9 @@ begin
          done             <= '0';
          bus_fetch_ena    <= '0';
          
+         execute_start    <= '0';
+         new_cycles_valid <= '0';
+         
          if (dma_on = '1' and fetch_available = '1' and state_decode = DECODE_DONE and state_execute = FETCH_OP and jump = '0') then
             CPU_bus_idle <= '1';
          else
@@ -584,7 +587,21 @@ begin
                 
             state_execute      <= FETCH_OP;
             
-            lastread           <= x"DEADDEAD"; -- for testing purpose only
+            -- only required for simulation, to test if e.g. drawing works, the cpu must run without doing anything
+            if (is_simu = '1') then
+            
+               lastread           <= x"DEADDEAD"; -- for testing purpose only
+            
+               if (do_step = '1') then 
+                  if (halt_cnt < 5) then
+                     halt_cnt <= halt_cnt + 1;
+                  else
+                     halt_cnt <= 0;
+                     new_cycles_valid <= '1';
+                     new_cycles_out   <= to_unsigned(6, 8);
+                  end if;
+               end if;
+            end if;
             
          else
          
@@ -706,9 +723,6 @@ begin
             end if;
             
             regs(16) <= Flag_Negative & Flag_Zero & Flag_Carry & Flag_V_Overflow & x"00000" & IRQ_disable & FIQ_disable & thumbmode & '1' & unsigned(cpu_mode);
-
-            execute_start    <= '0';
-            new_cycles_valid <= '0';
             
             if (dma_new_cycles = '1') then
                new_cycles_valid <= '1';

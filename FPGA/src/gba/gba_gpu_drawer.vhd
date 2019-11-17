@@ -8,6 +8,10 @@ use work.pProc_bus_gba.all;
 use work.pReg_gba_display.all;
 
 entity gba_gpu_drawer is
+   generic
+   (
+      is_simu : std_logic
+   );
    port 
    (
       clk100               : in  std_logic; 
@@ -27,11 +31,13 @@ entity gba_gpu_drawer is
       VRAM_Lo_addr         : in    integer range 0 to 16383;
       VRAM_Lo_datain       : in    std_logic_vector(31 downto 0);
       VRAM_Lo_dataout      : out   std_logic_vector(31 downto 0);
-      VRAM_Lo_we           : in    std_logic_vector(3 downto 0);
+      VRAM_Lo_we           : in    std_logic;
+      VRAM_Lo_be           : in    std_logic_vector(3 downto 0);
       VRAM_Hi_addr         : in    integer range 0 to 8191;
       VRAM_Hi_datain       : in    std_logic_vector(31 downto 0);
       VRAM_Hi_dataout      : out   std_logic_vector(31 downto 0);
-      VRAM_Hi_we           : in    std_logic_vector(3 downto 0);
+      VRAM_Hi_we           : in    std_logic;
+      VRAM_Hi_be           : in    std_logic_vector(3 downto 0);
                            
       OAMRAM_PROC_addr     : in    integer range 0 to 255;
       OAMRAM_PROC_datain   : in    std_logic_vector(31 downto 0);
@@ -498,73 +504,67 @@ begin
                                                                                                                                                                                                                
    iREG_BLDY                            : entity work.eProcReg_gba generic map (BLDY                         ) port map  (clk100, gb_bus, "00000"                           , REG_BLDY                          ); 
 
-   gvram_lo : for i in 0 to 3 generate
-      signal ram_dout_single1 : std_logic_vector(7 downto 0);
-      signal ram_dout_single2 : std_logic_vector(7 downto 0);
-      signal ram_din_single  : std_logic_vector(7 downto 0);
-   begin
+   ivram_lo: entity MEM.SyncRamDualByteEnable
+   generic map
+   (
+      is_simu    => is_simu,
+      BYTE_WIDTH => 8,
+      BYTES      => 4,
+      ADDR_WIDTH => 14
+   )
+   port map
+   (
+      clk        => clk100,
       
-      ibyteram: entity MEM.SyncRamDual
-      generic map
-      (
-         DATA_WIDTH => 8,
-         ADDR_WIDTH => 14
-      )
-      port map
-      (
-         clk        => clk100,
-         
-         addr_a     => VRAM_Lo_addr,
-         datain_a   => ram_din_single,
-         dataout_a  => ram_dout_single1,
-         we_a       => VRAM_Lo_we(i),
-         re_a       => '1',
-                  
-         addr_b     => VRAM_Drawer_addr_Lo,
-         datain_b   => x"00",
-         dataout_b  => ram_dout_single2,
-         we_b       => '0',
-         re_b       => '1'
-      );
+      addr_a     => VRAM_Lo_addr,
+      datain_a0  => VRAM_Lo_datain(7 downto 0),
+      datain_a1  => VRAM_Lo_datain(15 downto 8),
+      datain_a2  => VRAM_Lo_datain(23 downto 16),
+      datain_a3  => VRAM_Lo_datain(31 downto 24),
+      dataout_a  => VRAM_Lo_dataout,
+      we_a       => VRAM_Lo_we,
+      be_a       => VRAM_Lo_be,
+               
+      addr_b     => VRAM_Drawer_addr_Lo,
+      datain_b0  => x"00",
+      datain_b1  => x"00",
+      datain_b2  => x"00",
+      datain_b3  => x"00",
+      dataout_b  => VRAM_Drawer_data_Lo,
+      we_b       => '0',
+      be_b       => "0000"
+   );
+   
+   ivram_hi: entity MEM.SyncRamDualByteEnable
+   generic map
+   (
+      is_simu    => is_simu,
+      BYTE_WIDTH => 8,
+      BYTES      => 4,
+      ADDR_WIDTH => 13
+   )
+   port map
+   (
+      clk        => clk100,
       
-      ram_din_single <= VRAM_Lo_datain(((i+1) * 8) - 1 downto (i * 8));
-      VRAM_Lo_dataout(((i+1) * 8) - 1 downto (i * 8)) <= ram_dout_single1;
-      VRAM_Drawer_data_Lo(((i+1) * 8) - 1 downto (i * 8)) <= ram_dout_single2;
-   end generate; 
-
-   gvram_hi : for i in 0 to 3 generate
-      signal ram_dout_single1 : std_logic_vector(7 downto 0);
-      signal ram_dout_single2 : std_logic_vector(7 downto 0);
-      signal ram_din_single  : std_logic_vector(7 downto 0);
-   begin
-      
-      ibyteram: entity MEM.SyncRamDual
-      generic map
-      (
-         DATA_WIDTH => 8,
-         ADDR_WIDTH => 13
-      )
-      port map
-      (
-         clk        => clk100,
-         
-         addr_a     => VRAM_Hi_addr,
-         datain_a   => ram_din_single,
-         dataout_a  => ram_dout_single1,
-         we_a       => VRAM_Hi_we(i),
-         re_a       => '1',
-                  
-         addr_b     => VRAM_Drawer_addr_Hi,
-         datain_b   => x"00",
-         dataout_b  => ram_dout_single2,
-         we_b       => '0',
-         re_b       => '1'
-      );
-      
-      ram_din_single <= VRAM_Hi_datain(((i+1) * 8) - 1 downto (i * 8));
-      VRAM_Hi_dataout(((i+1) * 8) - 1 downto (i * 8)) <= ram_dout_single1;
-      VRAM_Drawer_data_Hi(((i+1) * 8) - 1 downto (i * 8)) <= ram_dout_single2;
-   end generate;   
+      addr_a     => VRAM_Hi_addr,
+      datain_a0  => VRAM_Hi_datain(7 downto 0),
+      datain_a1  => VRAM_Hi_datain(15 downto 8),
+      datain_a2  => VRAM_Hi_datain(23 downto 16),
+      datain_a3  => VRAM_Hi_datain(31 downto 24),
+      dataout_a  => VRAM_Hi_dataout,
+      we_a       => VRAM_Hi_we,
+      be_a       => VRAM_Hi_be,
+               
+      addr_b     => VRAM_Drawer_addr_Hi,
+      datain_b0  => x"00",
+      datain_b1  => x"00",
+      datain_b2  => x"00",
+      datain_b3  => x"00",
+      dataout_b  => VRAM_Drawer_data_Hi,
+      we_b       => '0',
+      be_b       => "0000"
+   );
                
    goamram : for i in 0 to 3 generate
       signal ram_dout_single1 : std_logic_vector(7 downto 0);

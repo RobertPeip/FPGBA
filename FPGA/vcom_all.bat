@@ -1,11 +1,9 @@
 
-vcom -93 -quiet -work  sim/tb ^
-src/tb/globals.vhd
-
 vcom -93 -quiet -work  sim/mem ^
 src/mem/SyncFifo.vhd ^
 src/mem/SyncRam.vhd ^
 src/mem/SyncRamDual.vhd ^
+src/mem/SyncRamDualByteEnable.vhd ^
 src/mem/SyncRamDualNotPow2.vhd 
 
 vcom -quiet -work sim/gba ^
