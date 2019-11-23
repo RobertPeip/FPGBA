@@ -33,17 +33,10 @@ architecture arch of gba_sound_ch4 is
    signal REG_Shift_Clock_Frequency      : std_logic_vector(SOUND4CNT_H_Shift_Clock_Frequency     .upper downto SOUND4CNT_H_Shift_Clock_Frequency     .lower) := (others => '0');    
    signal REG_Length_Flag                : std_logic_vector(SOUND4CNT_H_Length_Flag               .upper downto SOUND4CNT_H_Length_Flag               .lower) := (others => '0');    
    signal REG_Initial                    : std_logic_vector(SOUND4CNT_H_Initial                   .upper downto SOUND4CNT_H_Initial                   .lower) := (others => '0');    
-                  
-                 
+                               
    signal Sound_length_written               : std_logic;
-   signal Envelope_Step_Time_written         : std_logic;
-   signal Envelope_Direction_written         : std_logic;
-   signal Initial_Volume_of_envelope_written : std_logic; 
-          
-   signal Dividing_Ratio_of_Freq_written     : std_logic;                                                                                                                                                      
-   signal Counter_Step_Width_written         : std_logic;                                                                                                                                                      
-   signal Shift_Clock_Frequency_written      : std_logic;                                                                                                                                                      
-   signal Length_Flag_written                : std_logic;                                                                                                                                                      
+   signal Initial_Volume_of_envelope_written : std_logic;    
+   signal Dividing_Ratio_of_Freq_written     : std_logic;                                                                                                                                                                                                                                                                                                         
    signal Initial_written                    : std_logic;                                                                                                                                                      
           
    signal length_left   : unsigned(6 downto 0) := (others => '0');
@@ -69,14 +62,14 @@ architecture arch of gba_sound_ch4 is
 begin 
 
    iREG_Sound_length               : entity work.eProcReg_gba generic map ( SOUND4CNT_L_Sound_length               ) port map  (clk100, gb_bus, "000000"                       , REG_Sound_length               , Sound_length_written               );  
-   iREG_Envelope_Step_Time         : entity work.eProcReg_gba generic map ( SOUND4CNT_L_Envelope_Step_Time         ) port map  (clk100, gb_bus, REG_Envelope_Step_Time         , REG_Envelope_Step_Time         , Envelope_Step_Time_written         );  
-   iREG_Envelope_Direction         : entity work.eProcReg_gba generic map ( SOUND4CNT_L_Envelope_Direction         ) port map  (clk100, gb_bus, REG_Envelope_Direction         , REG_Envelope_Direction         , Envelope_Direction_written         );  
+   iREG_Envelope_Step_Time         : entity work.eProcReg_gba generic map ( SOUND4CNT_L_Envelope_Step_Time         ) port map  (clk100, gb_bus, REG_Envelope_Step_Time         , REG_Envelope_Step_Time         );  
+   iREG_Envelope_Direction         : entity work.eProcReg_gba generic map ( SOUND4CNT_L_Envelope_Direction         ) port map  (clk100, gb_bus, REG_Envelope_Direction         , REG_Envelope_Direction         );  
    iREG_Initial_Volume_of_envelope : entity work.eProcReg_gba generic map ( SOUND4CNT_L_Initial_Volume_of_envelope ) port map  (clk100, gb_bus, REG_Initial_Volume_of_envelope , REG_Initial_Volume_of_envelope , Initial_Volume_of_envelope_written ); 
                                                                                                                                                                         
    iREG_Dividing_Ratio_of_Freq     : entity work.eProcReg_gba generic map ( SOUND4CNT_H_Dividing_Ratio_of_Freq     ) port map  (clk100, gb_bus, REG_Dividing_Ratio_of_Freq     , REG_Dividing_Ratio_of_Freq     , Dividing_Ratio_of_Freq_written     );  
-   iREG_Counter_Step_Width         : entity work.eProcReg_gba generic map ( SOUND4CNT_H_Counter_Step_Width         ) port map  (clk100, gb_bus, REG_Counter_Step_Width         , REG_Counter_Step_Width         , Counter_Step_Width_written         );  
-   iREG_Shift_Clock_Frequency      : entity work.eProcReg_gba generic map ( SOUND4CNT_H_Shift_Clock_Frequency      ) port map  (clk100, gb_bus, REG_Shift_Clock_Frequency      , REG_Shift_Clock_Frequency      , Shift_Clock_Frequency_written      );  
-   iREG_Length_Flag                : entity work.eProcReg_gba generic map ( SOUND4CNT_H_Length_Flag                ) port map  (clk100, gb_bus, REG_Length_Flag                , REG_Length_Flag                , Length_Flag_written                );  
+   iREG_Counter_Step_Width         : entity work.eProcReg_gba generic map ( SOUND4CNT_H_Counter_Step_Width         ) port map  (clk100, gb_bus, REG_Counter_Step_Width         , REG_Counter_Step_Width         );  
+   iREG_Shift_Clock_Frequency      : entity work.eProcReg_gba generic map ( SOUND4CNT_H_Shift_Clock_Frequency      ) port map  (clk100, gb_bus, REG_Shift_Clock_Frequency      , REG_Shift_Clock_Frequency      );  
+   iREG_Length_Flag                : entity work.eProcReg_gba generic map ( SOUND4CNT_H_Length_Flag                ) port map  (clk100, gb_bus, REG_Length_Flag                , REG_Length_Flag                );  
    iREG_Initial                    : entity work.eProcReg_gba generic map ( SOUND4CNT_H_Initial                    ) port map  (clk100, gb_bus, "0"                            , REG_Initial                    , Initial_written                    );  
    
    iSOUND4CNT_LHighZero            : entity work.eProcReg_gba generic map ( SOUND4CNT_LHighZero                    ) port map  (clk100, gb_bus, x"0000");  
@@ -194,9 +187,9 @@ begin
          -- sound out
          if (ch_on = '1') then
             if (wave_on = '1') then
-               sound_out <= to_signed(128 * volume, 16);
+               sound_out <= to_signed(1 * volume, 16);
             else
-               sound_out <= to_signed(-128 * volume, 16);
+               sound_out <= to_signed(-1 * volume, 16);
             end if;
          else
             sound_out <= (others => '0');

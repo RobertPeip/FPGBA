@@ -143,7 +143,6 @@ architecture arch of gba_drawer_obj is
    signal pixeladdr_pre_6   : integer range -32768 to 32767;
    signal pixeladdr_pre_7   : integer range -32768 to 32767;
        
-   signal tilemult          : integer range 32 to 64;
    signal x_flip_offset     : integer range 3 to 7;
    signal y_flip_offset     : integer range 28 to 56;
    signal x_div             : integer range 1 to 2;
@@ -187,14 +186,12 @@ architecture arch of gba_drawer_obj is
    signal target_start      : integer range 0 to 239;
    signal target_eval       : integer range 0 to 239;
    signal target_wait       : integer range 0 to 239;
-   signal target_merge      : integer range 0 to 239;   
-   signal target_writeback  : integer range 0 to 239;   
+   signal target_merge      : integer range 0 to 239;    
                             
    signal enable_start      : std_logic;
    signal enable_eval       : std_logic;
    signal enable_wait       : std_logic;
    signal enable_merge      : std_logic;
-   signal enable_writeback  : std_logic;
                             
    signal second_pix_start  : std_logic;
    signal second_pix_eval   : std_logic;
@@ -342,7 +339,7 @@ begin
                   
                   pixeladdr_pre <= 32 * to_integer(unsigned(OAM_data2(OAM_TILE_HI downto OAM_TILE_LO)));
                   
-                  mosaic_v_plus1 <= to_integer(mosaic_v) + 1;
+                  --mosaic_v_plus1 <= to_integer(mosaic_v) + 1;
                   
                   case (to_integer(unsigned(OAM_data0(OAM_OBJSHAPE_HI downto OAM_OBJSHAPE_LO)))) is
                      when 0 => -- square
@@ -376,13 +373,13 @@ begin
                   end case;
                   
                   if (OAM_data0(OAM_HICOLOR) = '0') then
-                     tilemult      <= 32;
+                     --tilemult      <= 32;
                      x_flip_offset <= 3;
                      y_flip_offset <= 28;
                      x_div         <= 2;
                      x_size        <= 4;
                   else
-                     tilemult      <= 64;
+                     --tilemult      <= 64;
                      x_flip_offset <= 7;
                      y_flip_offset <= 56;
                      x_div         <= 1;
@@ -421,7 +418,7 @@ begin
                
                if (posx > 16#100#) then posx <= posx - 16#200#; end if;
                
-               mosaik_h_cnt <= 0;
+               --mosaik_h_cnt <= 0;
                
                -- affine
                pixeladdr_pre_a0 <= sizeX * 128;
@@ -515,7 +512,11 @@ begin
                      pixeladdr_x_aff3 <= to_unsigned(((yyy / 8) * 1024), 15);
 
                      pixeladdr_x_aff4 <= to_unsigned(((xxx mod 8) / x_div), 15);
-                     pixeladdr_x_aff5 <= to_unsigned(((xxx / 8) * tilemult), 15);
+                     if (Pixel_data0(OAM_HICOLOR) = '0') then
+                        pixeladdr_x_aff5 <= to_unsigned(((xxx / 8) * 32), 15);
+                     else
+                        pixeladdr_x_aff5 <= to_unsigned(((xxx / 8) * 64), 15);
+                     end if;
                      
                   -- synthesis translate_off
                   end if;
@@ -526,11 +527,19 @@ begin
                   
                   pixeladdr_calc := pixeladdr;
                   if (Pixel_data1(OAM_HFLIP) = '1') then
-                      pixeladdr_calc := pixeladdr_calc + (x_flip_offset - ((x mod 8) / x_div));
-                      pixeladdr_calc := pixeladdr_calc - (((x / 8) - ((sizeX / 8) - 1)) * tilemult);
+                     pixeladdr_calc := pixeladdr_calc + (x_flip_offset - ((x mod 8) / x_div));
+                     if (Pixel_data0(OAM_HICOLOR) = '0') then
+                        pixeladdr_calc := pixeladdr_calc - (((x / 8) - ((sizeX / 8) - 1)) * 32);
+                     else
+                        pixeladdr_calc := pixeladdr_calc - (((x / 8) - ((sizeX / 8) - 1)) * 64);
+                     end if;
                   else
-                      pixeladdr_calc := pixeladdr_calc + ((x mod 8) / x_div);
-                      pixeladdr_calc := pixeladdr_calc + ((x / 8) * tilemult);
+                     pixeladdr_calc := pixeladdr_calc + ((x mod 8) / x_div);
+                     if (Pixel_data0(OAM_HICOLOR) = '0') then
+                        pixeladdr_calc := pixeladdr_calc + ((x / 8) * 32);
+                     else
+                        pixeladdr_calc := pixeladdr_calc + ((x / 8) * 64);
+                     end if;
                   end if;
                   
                   pixeladdr_x_noaff <= to_unsigned(pixeladdr_calc, 15);
@@ -611,7 +620,7 @@ begin
          if (mode_eval = "10") then Pixel_wait.objwnd <= '1'; else Pixel_wait.objwnd <= '0'; end if;
          
          colorbyte := x"00";
-         case (readaddr_mux(1 downto 0)) is
+         case (readaddr_mux_eval(1 downto 0)) is
             when "00" => colorbyte := VRAM_Drawer_data(7  downto 0);
             when "01" => colorbyte := VRAM_Drawer_data(15 downto 8);
             when "10" => colorbyte := VRAM_Drawer_data(23 downto 16);
@@ -655,9 +664,6 @@ begin
          enable_merge   <= enable_wait;
          
          -- fourth cycle
-         target_writeback <= target_merge;
-         enable_writeback <= enable_merge;
-         
          pixel_we     <= '0';
          pixel_objwnd <= '0';
          pixel_x      <= target_merge;

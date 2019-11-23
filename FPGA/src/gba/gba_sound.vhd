@@ -15,7 +15,8 @@ entity gba_sound is
       timer1_tick         : in    std_logic;
       sound_dma_req       : out   std_logic_vector(1 downto 0);
       
-      sound_out           : out   std_logic_vector(15 downto 0) := (others => '0');
+      sound_out_left      : out   std_logic_vector(15 downto 0) := (others => '0');
+      sound_out_right     : out   std_logic_vector(15 downto 0) := (others => '0');
       
       debug_fifocount     : out   integer
    );
@@ -64,8 +65,11 @@ architecture arch of gba_sound is
    signal sound_out_ch2  : signed(15 downto 0);
    signal sound_out_ch3  : signed(15 downto 0);
    signal sound_out_ch4  : signed(15 downto 0);
-   signal sound_out_dmaA : signed(15 downto 0);
-   signal sound_out_dmaB : signed(15 downto 0);
+   
+   signal sound_out_dmaA_l : signed(15 downto 0);
+   signal sound_out_dmaA_r : signed(15 downto 0);
+   signal sound_out_dmaB_l : signed(15 downto 0);
+   signal sound_out_dmaB_r : signed(15 downto 0);
    
    signal sound_on_ch1  : std_logic;
    signal sound_on_ch2  : std_logic;
@@ -74,15 +78,28 @@ architecture arch of gba_sound is
    signal sound_on_dmaA : std_logic;
    signal sound_on_dmaB : std_logic;
    
-   signal soundvol_leftright : integer range 0 to 15;
+   signal soundmix1_l  : signed(15 downto 0) := (others => '0'); 
+   signal soundmix1_r  : signed(15 downto 0) := (others => '0'); 
+   signal soundmix2_l  : signed(15 downto 0) := (others => '0'); 
+   signal soundmix2_r  : signed(15 downto 0) := (others => '0'); 
+   signal soundmix3_l  : signed(15 downto 0) := (others => '0'); 
+   signal soundmix3_r  : signed(15 downto 0) := (others => '0'); 
+   signal soundmix4_l  : signed(15 downto 0) := (others => '0'); 
+   signal soundmix4_r  : signed(15 downto 0) := (others => '0'); 
+   signal soundmix14_l : signed(15 downto 0) := (others => '0'); 
+   signal soundmix14_r : signed(15 downto 0) := (others => '0'); 
    
-   signal soundmix1 : signed(15 downto 0) := (others => '0'); 
-   signal soundmix2 : signed(15 downto 0) := (others => '0'); 
-   signal soundmix3 : signed(15 downto 0) := (others => '0'); 
-   signal soundmix4 : signed(15 downto 0) := (others => '0'); 
-   signal soundmix5 : signed(15 downto 0) := (others => '0'); 
-   signal soundmix6 : signed(15 downto 0) := (others => '0'); 
-   signal soundmix7 : signed(15 downto 0) := (others => '0'); 
+   signal soundmix5_l : signed(15 downto 0) := (others => '0'); 
+   signal soundmix5_r : signed(15 downto 0) := (others => '0'); 
+   signal soundmix6_l : signed(15 downto 0) := (others => '0'); 
+   signal soundmix6_r : signed(15 downto 0) := (others => '0'); 
+   signal soundmix7_l : signed(15 downto 0) := (others => '0'); 
+   signal soundmix7_r : signed(15 downto 0) := (others => '0'); 
+   
+   signal soundmix8_l : signed(15 downto 0) := (others => '0'); 
+   signal soundmix8_r : signed(15 downto 0) := (others => '0'); 
+   signal soundmix9_l : signed(9 downto 0) := (others => '0'); 
+   signal soundmix9_r : signed(9 downto 0) := (others => '0'); 
    
            
 begin 
@@ -224,7 +241,8 @@ begin
       timer1_tick         => timer1_tick,
       dma_req             => sound_dma_req(0),
                            
-      sound_out           => sound_out_dmaA,
+      sound_out_left      => sound_out_dmaA_l,
+      sound_out_right     => sound_out_dmaA_r,
       sound_on            => sound_on_dmaA,
       
       debug_fifocount     => debug_fifocount
@@ -251,7 +269,8 @@ begin
       timer1_tick         => timer1_tick,
       dma_req             => sound_dma_req(1),
                            
-      sound_out           => sound_out_dmaB,
+      sound_out_left      => sound_out_dmaB_l,
+      sound_out_right     => sound_out_dmaB_r,
       sound_on            => sound_on_dmaB,
       
       debug_fifocount     => open
@@ -276,56 +295,112 @@ begin
          end if;
          
          -- sound channel mixing
-         if (sound_on_ch1 = '1' and (Sound_1_Enable_Flags_LEFT = "1" or Sound_1_Enable_Flags_RIGHT = "1")) then
-            soundmix1 <= sound_out_ch1;
+         
+         -- channel 1
+         if (sound_on_ch1 = '1' and Sound_1_Enable_Flags_LEFT = "1") then
+            soundmix1_l <= sound_out_ch1;
          else
-            soundmix1 <= (others => '0');
+            soundmix1_l <= (others => '0');
+         end if;
+         if (sound_on_ch1 = '1' and Sound_1_Enable_Flags_RIGHT = "1") then
+            soundmix1_r <= sound_out_ch1;
+         else
+            soundmix1_r <= (others => '0');
          end if;
          
-         if (sound_on_ch2 = '1' and (Sound_2_Enable_Flags_LEFT = "1" or Sound_2_Enable_Flags_RIGHT = "1")) then
-            soundmix2 <= soundmix1 + sound_out_ch2;
+         -- channel 2
+         if (sound_on_ch2 = '1' and Sound_2_Enable_Flags_LEFT = "1") then
+            soundmix2_l <= soundmix1_l + sound_out_ch2;
          else
-            soundmix2 <= soundmix1;
+            soundmix2_l <= soundmix1_l;
+         end if;
+         if (sound_on_ch2 = '1' and Sound_2_Enable_Flags_RIGHT = "1") then
+            soundmix2_r <= soundmix1_r + sound_out_ch2;
+         else
+            soundmix2_r <= soundmix1_r;
          end if;
          
-         if (sound_on_ch3 = '1' and (Sound_3_Enable_Flags_LEFT = "1" or Sound_3_Enable_Flags_RIGHT = "1")) then
-            soundmix3 <= soundmix2 + sound_out_ch3;
+         -- channel 3
+         if (sound_on_ch3 = '1' and Sound_3_Enable_Flags_LEFT = "1") then
+            soundmix3_l <= soundmix2_l + sound_out_ch3;
          else
-            soundmix3 <= soundmix2;
+            soundmix3_l <= soundmix2_l;
+         end if;
+         if (sound_on_ch3 = '1' and Sound_3_Enable_Flags_RIGHT = "1") then
+            soundmix3_r <= soundmix2_r + sound_out_ch3;
+         else
+            soundmix3_r <= soundmix2_r;
          end if;
          
-         if (sound_on_ch4 = '1' and (Sound_4_Enable_Flags_LEFT = "1" or Sound_4_Enable_Flags_RIGHT = "1")) then
-            soundmix4 <= soundmix3 + sound_out_ch4;
+         -- channel 4
+         if (sound_on_ch4 = '1' and Sound_4_Enable_Flags_LEFT = "1") then
+            soundmix4_l <= soundmix3_l + sound_out_ch4;
          else
-            soundmix4 <= soundmix3;
+            soundmix4_l <= soundmix3_l;
+         end if;
+         if (sound_on_ch4 = '1' and Sound_4_Enable_Flags_RIGHT = "1") then
+            soundmix4_r <= soundmix3_r + sound_out_ch4;
+         else
+            soundmix4_r <= soundmix3_r;
          end if;
          
-         soundvol_leftright <= to_integer(unsigned(Sound_1_4_Master_Volume_LEFT)) + to_integer(unsigned(Sound_1_4_Master_Volume_RIGHT));
+         -- sound1-4 volume control
+         soundmix14_l <= resize(soundmix4_l * to_integer(unsigned(Sound_1_4_Master_Volume_LEFT)), 16);
+         soundmix14_r <= resize(soundmix4_r * to_integer(unsigned(Sound_1_4_Master_Volume_RIGHT)), 16);
          
          case (to_integer(unsigned(Sound_1_4_Volume))) is
-             when 0     => soundmix5 <= resize((soundmix4 * soundvol_leftright) / 64, 16);
-             when 1     => soundmix5 <= resize((soundmix4 * soundvol_leftright) / 32, 16);
-             when 2     => soundmix5 <= resize((soundmix4 * soundvol_leftright) / 16, 16);
-             when 3     => soundmix5 <= (others => '0'); -- +3 is not allowed
+             when 0     => soundmix5_l <= soundmix14_l / 4;   soundmix5_r <= soundmix14_r / 4;
+             when 1     => soundmix5_l <= soundmix14_l / 2;   soundmix5_r <= soundmix14_r / 2;
+             when 2     => soundmix5_l <= soundmix14_l;       soundmix5_r <= soundmix14_r;
+             when 3     => soundmix5_l <= (others => '0');    soundmix5_r <= (others => '0');  -- 3 is not allowed
              when others => null;
          end case;
 
+         -- mix in dma sound
          if (sound_on_dmaA = '1') then
-            soundmix6 <= soundmix5 + sound_out_dmaA;
+            soundmix6_l <= soundmix5_l + sound_out_dmaA_l;
+            soundmix6_r <= soundmix5_r + sound_out_dmaA_r;
          else
-            soundmix6 <= soundmix5;
+            soundmix6_l <= soundmix5_l;
+            soundmix6_r <= soundmix5_r;
          end if;
          
          if (sound_on_dmaB = '1') then
-            soundmix7 <= soundmix6 + sound_out_dmaB;
+            soundmix7_l <= soundmix6_l + sound_out_dmaB_l;
+            soundmix7_r <= soundmix6_r + sound_out_dmaB_r;
          else
-            soundmix7 <= soundmix6;
+            soundmix7_l <= soundmix6_l;
+            soundmix7_r <= soundmix6_r;
          end if;
          
-         if (PSG_FIFO_Master_Enable = "1") then -- should usually reset all sound registers
-            sound_out <= std_logic_vector(soundmix7);
+         -- skip sound bias and clip on signed instead
+         soundmix8_l <= soundmix7_l; -- + to_integer(unsigned(REG_SOUNDBIAS));
+         soundmix8_r <= soundmix7_r; -- + to_integer(unsigned(REG_SOUNDBIAS));
+
+         -- clipping
+         if (soundmix8_l < -512) then
+            soundmix9_l <= to_signed(-512, 10);
+         elsif (soundmix8_l > 511) then
+            soundmix9_l <= to_signed(511, 10);
          else
-            sound_out <= (others => '0');
+            soundmix9_l <= soundmix8_l(9 downto 0);
+         end if;
+         
+         if (soundmix8_r < -512) then
+            soundmix9_r <= to_signed(-512, 10);
+         elsif (soundmix8_r > 511) then
+            soundmix9_r <= to_signed(511, 10);
+         else
+            soundmix9_r <= soundmix8_r(9 downto 0);
+         end if;
+
+         -- output enable
+         if (PSG_FIFO_Master_Enable = "1") then -- should usually also reset all sound registers
+            sound_out_left  <= std_logic_vector(resize(soundmix9_l * 16, 16));
+            sound_out_right <= std_logic_vector(resize(soundmix9_r * 16, 16));
+         else
+            sound_out_left  <= (others => '0');
+            sound_out_right <= (others => '0');
          end if;
       
       end if;

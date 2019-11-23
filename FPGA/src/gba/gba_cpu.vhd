@@ -79,11 +79,9 @@ architecture arch of gba_cpu is
    
    signal thumbmode        : std_logic;
    signal halt             : std_logic;
-   signal stop             : std_logic;
          
    signal IRQ_disable      : std_logic;
    signal FIQ_disable      : std_logic;
-   signal irpnext          : std_logic;
    
    signal Flag_Zero        : std_logic;
    signal Flag_Carry       : std_logic;
@@ -97,7 +95,6 @@ architecture arch of gba_cpu is
    signal regs : t_regs;
 
    signal PC               : unsigned(31 downto 0) := (others => '0');
-   signal PC_1             : unsigned(31 downto 0) := (others => '0');
 
    signal regs_0_8  : unsigned(31 downto 0);
    signal regs_0_9  : unsigned(31 downto 0);
@@ -137,14 +134,12 @@ architecture arch of gba_cpu is
    
    -- ############# Timing ##############
    
-   signal fetch_cycles       : integer range 0 to 15 := 0;
    signal decode_cycles      : integer range 0 to 15 := 0;
    signal execute_cycles     : integer range 0 to 255 := 0;
    signal execute_addcycles  : integer range 0 to 31 := 0;
    
    signal dataticksAccess16        : integer range 0 to 31 := 0;
    signal dataticksAccess32        : integer range 0 to 31 := 0;
-   signal dataticksAccessSeq16     : integer range 0 to 31 := 0;
    signal dataticksAccessSeq32     : integer range 0 to 31 := 0;
    signal codeticksAccess16        : integer range 0 to 31 := 0;
    signal codeticksAccess32        : integer range 0 to 31 := 0;
@@ -570,10 +565,8 @@ begin
             regs_5_17 <= (others => '0');
             
             PC <= (others => '0');
-            irpnext <= '0';
 
             halt <= '0';
-            stop <= '0';
             
             -- ################ internal
                
@@ -629,7 +622,6 @@ begin
                      bus_fetch_acc <= ACCESS_32BIT; 
                      PC            <= PC + 4;
                   end if;
-                  PC_1 <= PC;
                   wait_fetch <= '1';
                   fetch_ack  <= '1';
                end if;
@@ -656,8 +648,6 @@ begin
                end if;
                
             end if;
-            
-            fetch_cycles <= 1;
             
             -- ############################
             -- Decode
@@ -1817,7 +1807,7 @@ begin
    
    dataticksAccess16        <=    memoryWait16(to_integer(unsigned(busaddress(27 downto 24))));
    dataticksAccess32        <=    memoryWait32(to_integer(unsigned(busaddress(27 downto 24))));
-   dataticksAccessSeq16     <= memoryWaitSeq16(to_integer(unsigned(busaddress(27 downto 24))));
+   --dataticksAccessSeq16     <= memoryWaitSeq16(to_integer(unsigned(busaddress(27 downto 24)))); -- probably not required, as dataseq32 is only for block read/write and block cmd can only do 32bit accesses 
    dataticksAccessSeq32     <= memoryWaitSeq32(to_integer(unsigned(busaddress(27 downto 24))));
                             
    codeticksAccess16        <=    memoryWait16(to_integer(unsigned(PC(27 downto 24))));
@@ -3063,6 +3053,8 @@ begin
                      file_open(f_status, outfile, filename_current, write_mode);
                      file_close(outfile);
                      file_open(f_status, outfile, filename_current, append_mode);
+                     write(line_out, string'("reg 00   reg 01   reg 02   reg 03   reg 04   reg 05   reg 06   reg 07   reg 08   reg 09   reg 10   reg 11   reg 12   reg 13   reg 14   reg 15   opcode   NCZV newticks PF  T Md I IFin T Timer0   Timer1   Timer2   Timer3   MEMORY01 MEMORY02 MEMORY03 DMATrans Reg 16   Reg 17   R13usr   R14usr   R13irq   R14irq   R13svc   R14svc   SPSR_irq SPSR_svc "));
+                     writeline(outfile, line_out);
                   end if;
                   
                   if (recordcount > 1000) then

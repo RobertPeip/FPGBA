@@ -311,7 +311,6 @@ architecture arch of gba_gpu_drawer is
    signal busy_mode2_3 : std_logic;
    signal busy_mode345 : std_logic;
    signal busy_modeobj : std_logic;
-   signal busy_any     : std_logic;
    
    signal draw_allmod   : std_logic_vector(7 downto 0);
    signal busy_allmod   : std_logic_vector(7 downto 0);
@@ -944,8 +943,6 @@ begin
             when others => null;
          end case;
          
-         busy_any <= busy_mode0_0 or busy_mode0_1 or busy_mode0_2 or busy_mode0_3 or busy_mode2_2 or busy_mode2_3 or busy_mode345 or busy_modeobj;
-         
          -- wait with delete for 2 clock cycles
          clear_trigger_1 <= clear_trigger;
          if (clear_trigger_1 = '1') then 
@@ -1306,12 +1303,12 @@ begin
             end if;
          end if;
          
-         if (drawline = '1' and linecounter = 0) then
-            mosaik_bg0_vcnt <= 0;
-            mosaik_bg1_vcnt <= 0;
-            mosaik_bg2_vcnt <= 0;
-            mosaik_bg3_vcnt <= 0;
-         end if;
+         --if (drawline = '1' and linecounter = 0) then
+         --   mosaik_bg0_vcnt <= 0;
+         --   mosaik_bg1_vcnt <= 0;
+         --   mosaik_bg2_vcnt <= 0;
+         --   mosaik_bg3_vcnt <= 0;
+         --end if;
 
       end if;
    end process;

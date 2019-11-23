@@ -29,7 +29,8 @@ entity gba_sound_dma is
       timer1_tick         : in    std_logic;
       dma_req             : out   std_logic := '0';
       
-      sound_out           : out   signed(15 downto 0) := (others => '0');
+      sound_out_left      : out   signed(15 downto 0) := (others => '0');
+      sound_out_right     : out   signed(15 downto 0) := (others => '0');
       sound_on            : out   std_logic := '0';
       
       debug_fifocount     : out   integer
@@ -58,6 +59,8 @@ architecture arch of gba_sound_dma is
    signal fifo_Dout  : std_logic_vector(7 downto 0);
    signal fifo_Rd    : std_logic := '0';
    signal fifo_Empty : std_logic;
+   
+   signal sound_out  : signed(15 downto 0) := (others => '0');
 
    
 begin 
@@ -68,6 +71,9 @@ begin
    sound_on <= any_on;
    
    debug_fifocount <= fifo_cnt;
+   
+   sound_out_left  <= sound_out when Enable_LEFT  = '1' else (others => '0');
+   sound_out_right <= sound_out when Enable_RIGHT = '1' else (others => '0');
    
    iSyncFifo : entity MEM.SyncFifo
    generic map
@@ -103,9 +109,9 @@ begin
          fifo_valid <= fifo_Rd;
          if (fifo_valid = '1') then
             if (volume_high = '1') then
-               sound_out <= resize(signed(fifo_Dout) * 64, sound_out'length);
+               sound_out <= resize(signed(fifo_Dout) * 4, sound_out'length);
             else
-               sound_out <= resize(signed(fifo_Dout) * 32, sound_out'length);
+               sound_out <= resize(signed(fifo_Dout) * 2, sound_out'length);
             end if;
          end if;
          
@@ -138,10 +144,10 @@ begin
                fifo_cnt <= fifo_cnt + 1;
                fifo_Wr  <= '1';
                case (fillbytes) is
-                  when 4 => fifo_Din <= FIFO_REGISTER( 7 downto 0);
-                  when 3 => fifo_Din <= FIFO_REGISTER(15 downto 8);
-                  when 2 => fifo_Din <= FIFO_REGISTER(23 downto 16);
-                  when 1 => fifo_Din <= FIFO_REGISTER(31 downto 24);
+                  when 4 => fifo_Din <= write_data( 7 downto 0);
+                  when 3 => fifo_Din <= write_data(15 downto 8);
+                  when 2 => fifo_Din <= write_data(23 downto 16);
+                  when 1 => fifo_Din <= write_data(31 downto 24);
                   when others => null;
                end case;
             end if;

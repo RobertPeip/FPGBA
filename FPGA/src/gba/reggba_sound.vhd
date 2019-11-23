@@ -111,7 +111,7 @@ package pReg_gba_sound is
    constant SOUNDCNT_XHighZero                       : regmap_type := (16#084#,  31,     16,        1,        0,   readonly);  -- must return zero                                  
    
    constant SOUNDBIAS                                : regmap_type := (16#088#,  15,      0,        1, 16#0200#,   readwrite); -- Sound PWM Control (R/W)
-   constant SOUNDBIAS_Bias_Level                     : regmap_type := (16#088#,   9,      0,        1,        0,   readwrite); -- 0-9    (Default=200h, converting signed samples into unsigned) 
+   constant SOUNDBIAS_Bias_Level                     : regmap_type := (16#088#,   9,      0,        1, 16#0200#,   readwrite); -- 0-9    (Default=200h, converting signed samples into unsigned) 
    constant SOUNDBIAS_Amp_Res_Sampling_Cycle         : regmap_type := (16#088#,  15,     14,        1,        0,   readwrite); -- 14-15  (Default=0, see below) 
 
    constant SOUNDBIAS_HighZero                       : regmap_type := (16#088#,  31,     16,        1,        0,   readonly);  -- must return zero                                  

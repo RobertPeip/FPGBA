@@ -7,7 +7,11 @@ use work.pProc_bus_gba.all;
 entity gba_top is
    generic
    (
-      is_simu : std_logic
+      Softmap_GBA_Gamerom_ADDR : integer; -- count: 8388608  -- 32 Mbyte Data for GameRom
+      Softmap_GBA_WRam_ADDR    : integer; -- count:   65536  -- 256 Kbyte Data for GBA WRam Large
+      Softmap_GBA_FLASH_ADDR   : integer; -- count:  131072  -- 128/512 Kbyte Data for GBA Flash
+      Softmap_GBA_EEPROM_ADDR  : integer; -- count:    8192  -- 8/32 Kbyte Data for GBA EEProm
+      is_simu                  : std_logic := '0'
    );
    port 
    (
@@ -32,6 +36,10 @@ entity gba_top is
       bus_out_rnw        : out    std_logic;                     -- read = 1, write = 0
       bus_out_ena        : out    std_logic;                     -- one cycle high for each action
       bus_out_done       : in     std_logic;                     -- should be one cycle high when write is done or read value is valid
+      -- save memory used
+      save_eeprom        : out    std_logic;
+      save_sram          : out    std_logic;
+      save_flash         : out    std_logic;
       -- Keys - all active high   
       KeyA               : in     std_logic; 
       KeyB               : in     std_logic;
@@ -55,7 +63,8 @@ entity gba_top is
       pixel_out_data     : out   std_logic_vector(14 downto 0);  -- RGB data for framebuffer 
       pixel_out_we       : out   std_logic;                      -- new pixel for framebuffer 
       -- sound                            
-      sound_out          : out    std_logic_vector(15 downto 0) := (others => '0')
+      sound_out_left     : out   std_logic_vector(15 downto 0) := (others => '0');
+      sound_out_right    : out   std_logic_vector(15 downto 0) := (others => '0')
    );
 end entity;
 
@@ -268,7 +277,11 @@ begin
    igba_memorymux : entity work.gba_memorymux
    generic map
    (
-      is_simu => is_simu
+      is_simu                  => is_simu,
+      Softmap_GBA_Gamerom_ADDR => Softmap_GBA_Gamerom_ADDR,
+      Softmap_GBA_WRam_ADDR    => Softmap_GBA_WRam_ADDR,
+      Softmap_GBA_FLASH_ADDR   => Softmap_GBA_FLASH_ADDR,
+      Softmap_GBA_EEPROM_ADDR  => Softmap_GBA_EEPROM_ADDR
    )
    port map
    (
@@ -299,6 +312,10 @@ begin
       mem_bus_done         => mem_bus_done,
       
       bus_lowbits          => bus_lowbits,
+      
+      save_eeprom          => save_eeprom,
+      save_sram            => save_sram,  
+      save_flash           => save_flash, 
       
       new_cycles           => new_cycles,      
       new_cycles_valid     => new_cycles_valid,
@@ -378,7 +395,8 @@ begin
       timer1_tick          => timer1_tick,
       sound_dma_req        => sound_dma_req,
       
-      sound_out            => sound_out,
+      sound_out_left     => sound_out_left,
+      sound_out_right    => sound_out_right,
       
       debug_fifocount      => debug_fifocount
    );
@@ -485,7 +503,7 @@ begin
       
       dma_on           => dma_on,
       do_step          => gba_step,
-      done             => cpu_done,
+      done             => open,--cpu_done,
       CPU_bus_idle     => CPU_bus_idle,
       PC_in_BIOS       => PC_in_BIOS,
       lastread         => lastread,
@@ -509,7 +527,7 @@ begin
       timerdebug2      => timerdebug2,
       timerdebug3      => timerdebug3,
       
-      cyclenr          => cyclenr
+      cyclenr          => open --cyclenr
    );
    
    iREG_IRP_IE  : entity work.eProcReg_gba generic map (work.pReg_gba_system.IRP_IE ) port map  (clk100, gb_bus, REG_IRP_IE , REG_IRP_IE );

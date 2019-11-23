@@ -39,17 +39,11 @@ architecture arch of gba_sound_ch3 is
    signal REG_WAVE_RAM3                        : std_logic_vector(WAVE_RAM3.upper downto WAVE_RAM3.lower) := (others => '0');
    signal REG_WAVE_RAM4                        : std_logic_vector(WAVE_RAM4.upper downto WAVE_RAM4.lower) := (others => '0');
  
-   signal SOUND3CNT_L_Wave_RAM_Dimension_written   : std_logic;    
    signal SOUND3CNT_L_Wave_RAM_Bank_Number_written : std_logic;    
    signal SOUND3CNT_L_Sound_Channel_3_Off_written  : std_logic;    
-  
    signal SOUND3CNT_H_Sound_length_written         : std_logic;    
    signal SOUND3CNT_H_Sound_Volume_written         : std_logic;    
-   signal SOUND3CNT_H_Force_Volume_written         : std_logic;    
-      
    signal SOUND3CNT_X_Sample_Rate_written          : std_logic;    
-   signal SOUND3CNT_X_Length_Flag_written          : std_logic;    
-   signal SOUND3CNT_X_Initial_written              : std_logic; 
 
    signal waveram_written  : std_logic;
    signal waveram_written2 : std_logic;
@@ -84,17 +78,17 @@ architecture arch of gba_sound_ch3 is
    
 begin 
 
-   iREG_SOUND3CNT_L_Wave_RAM_Dimension   : entity work.eProcReg_gba generic map ( SOUND3CNT_L_Wave_RAM_Dimension   ) port map  (clk100, gb_bus, REG_SOUND3CNT_L_Wave_RAM_Dimension   , REG_SOUND3CNT_L_Wave_RAM_Dimension   , SOUND3CNT_L_Wave_RAM_Dimension_written   );  
+   iREG_SOUND3CNT_L_Wave_RAM_Dimension   : entity work.eProcReg_gba generic map ( SOUND3CNT_L_Wave_RAM_Dimension   ) port map  (clk100, gb_bus, REG_SOUND3CNT_L_Wave_RAM_Dimension   , REG_SOUND3CNT_L_Wave_RAM_Dimension   );  
    iREG_SOUND3CNT_L_Wave_RAM_Bank_Number : entity work.eProcReg_gba generic map ( SOUND3CNT_L_Wave_RAM_Bank_Number ) port map  (clk100, gb_bus, REG_SOUND3CNT_L_Wave_RAM_Bank_Number , REG_SOUND3CNT_L_Wave_RAM_Bank_Number , SOUND3CNT_L_Wave_RAM_Bank_Number_written );  
    iREG_SOUND3CNT_L_Sound_Channel_3_Off  : entity work.eProcReg_gba generic map ( SOUND3CNT_L_Sound_Channel_3_Off  ) port map  (clk100, gb_bus, REG_SOUND3CNT_L_Sound_Channel_3_Off  , REG_SOUND3CNT_L_Sound_Channel_3_Off  , SOUND3CNT_L_Sound_Channel_3_Off_written  );  
                                                                                                                                                                                                                             
    iREG_SOUND3CNT_H_Sound_length         : entity work.eProcReg_gba generic map ( SOUND3CNT_H_Sound_length         ) port map  (clk100, gb_bus, "00000000"                           , REG_SOUND3CNT_H_Sound_length         , SOUND3CNT_H_Sound_length_written         );  
    iREG_SOUND3CNT_H_Sound_Volume         : entity work.eProcReg_gba generic map ( SOUND3CNT_H_Sound_Volume         ) port map  (clk100, gb_bus, REG_SOUND3CNT_H_Sound_Volume         , REG_SOUND3CNT_H_Sound_Volume         , SOUND3CNT_H_Sound_Volume_written         );  
-   iREG_SOUND3CNT_H_Force_Volume         : entity work.eProcReg_gba generic map ( SOUND3CNT_H_Force_Volume         ) port map  (clk100, gb_bus, REG_SOUND3CNT_H_Force_Volume         , REG_SOUND3CNT_H_Force_Volume         , SOUND3CNT_H_Force_Volume_written         );  
+   iREG_SOUND3CNT_H_Force_Volume         : entity work.eProcReg_gba generic map ( SOUND3CNT_H_Force_Volume         ) port map  (clk100, gb_bus, REG_SOUND3CNT_H_Force_Volume         , REG_SOUND3CNT_H_Force_Volume         );  
                                                                                                                                                                                                                             
    iREG_SOUND3CNT_X_Sample_Rate          : entity work.eProcReg_gba generic map ( SOUND3CNT_X_Sample_Rate          ) port map  (clk100, gb_bus, "00000000000"                        , REG_SOUND3CNT_X_Sample_Rate          , SOUND3CNT_X_Sample_Rate_written          );  
-   iREG_SOUND3CNT_X_Length_Flag          : entity work.eProcReg_gba generic map ( SOUND3CNT_X_Length_Flag          ) port map  (clk100, gb_bus, REG_SOUND3CNT_X_Length_Flag          , REG_SOUND3CNT_X_Length_Flag          , SOUND3CNT_X_Length_Flag_written          );  
-   iREG_SOUND3CNT_X_Initial              : entity work.eProcReg_gba generic map ( SOUND3CNT_X_Initial              ) port map  (clk100, gb_bus, "0"                                  , REG_SOUND3CNT_X_Initial              , SOUND3CNT_X_Initial_written              );  
+   iREG_SOUND3CNT_X_Length_Flag          : entity work.eProcReg_gba generic map ( SOUND3CNT_X_Length_Flag          ) port map  (clk100, gb_bus, REG_SOUND3CNT_X_Length_Flag          , REG_SOUND3CNT_X_Length_Flag          );  
+   iREG_SOUND3CNT_X_Initial              : entity work.eProcReg_gba generic map ( SOUND3CNT_X_Initial              ) port map  (clk100, gb_bus, "0"                                  , REG_SOUND3CNT_X_Initial              );  
    
    iREG_SOUND3CNT_XHighZero              : entity work.eProcReg_gba generic map ( SOUND3CNT_XHighZero              ) port map  (clk100, gb_bus, x"0000");  
    
@@ -217,7 +211,7 @@ begin
          
          -- sound out
          if (ch_on = '1') and (choutput_on = '1') then
-            sound_out <= to_signed(256 * wave_vol_shifted, 16);
+            sound_out <= to_signed(wave_vol_shifted, 16);
             sound_on  <= '1';
          else
             sound_out <= (others => '0');

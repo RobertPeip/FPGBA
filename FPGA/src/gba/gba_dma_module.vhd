@@ -66,17 +66,7 @@ architecture arch of gba_dma_module is
    signal CNT_H_DMA_Start_Timing   : std_logic_vector(Reg_CNT_H_DMA_Start_Timing  .upper downto Reg_CNT_H_DMA_Start_Timing  .lower) := (others => '0');
    signal CNT_H_IRQ_on             : std_logic_vector(Reg_CNT_H_IRQ_on            .upper downto Reg_CNT_H_IRQ_on            .lower) := (others => '0');
    signal CNT_H_DMA_Enable         : std_logic_vector(Reg_CNT_H_DMA_Enable        .upper downto Reg_CNT_H_DMA_Enable        .lower) := (others => '0');
-
-   signal SAD_written                        : std_logic;                                                                                                                                                      
-   signal DAD_written                        : std_logic;                                                                                                                                                      
-   signal CNT_L_written                      : std_logic;                                                                                                                                                                                                                                                                                                           
-   signal CNT_H_Dest_Addr_Control_written    : std_logic;                                                                                                                                                      
-   signal CNT_H_Source_Adr_Control_written   : std_logic;                                                                                                                                                      
-   signal CNT_H_DMA_Repeat_written           : std_logic;                                                                                                                                                      
-   signal CNT_H_DMA_Transfer_Type_written    : std_logic;                                                                                                                                                      
-   signal CNT_H_Game_Pak_DRQ_written         : std_logic;                                                                                                                                                      
-   signal CNT_H_DMA_Start_Timing_written     : std_logic;                                                                                                                                                      
-   signal CNT_H_IRQ_on_written               : std_logic;                                                                                                                                                      
+                                                                                                                                                   
    signal CNT_H_DMA_Enable_written           : std_logic;   
 
    signal Enable  : std_logic_vector(0 downto 0) := "0";
@@ -110,19 +100,19 @@ begin
 
    gDRQ : if has_DRQ = true generate
    begin
-      iCNT_H_Game_Pak_DRQ       : entity work.eProcReg_gba generic map ( Reg_CNT_H_Game_Pak_DRQ       ) port map  (clk100, gb_bus, CNT_H_Game_Pak_DRQ       , CNT_H_Game_Pak_DRQ       , CNT_H_Game_Pak_DRQ_written       );  
+      iCNT_H_Game_Pak_DRQ       : entity work.eProcReg_gba generic map ( Reg_CNT_H_Game_Pak_DRQ       ) port map  (clk100, gb_bus, CNT_H_Game_Pak_DRQ       , CNT_H_Game_Pak_DRQ);  
    end generate;
    
-   iSAD                      : entity work.eProcReg_gba generic map ( Reg_SAD                      ) port map  (clk100, gb_bus, x"00000000"              , SAD                      , SAD_written                      );  
-   iDAD                      : entity work.eProcReg_gba generic map ( Reg_DAD                      ) port map  (clk100, gb_bus, x"00000000"              , DAD                      , DAD_written                      );  
-   iCNT_L                    : entity work.eProcReg_gba generic map ( Reg_CNT_L                    ) port map  (clk100, gb_bus, x"0000"                  , CNT_L                    , CNT_L_written                    );   
-   iCNT_H_Dest_Addr_Control  : entity work.eProcReg_gba generic map ( Reg_CNT_H_Dest_Addr_Control  ) port map  (clk100, gb_bus, CNT_H_Dest_Addr_Control  , CNT_H_Dest_Addr_Control  , CNT_H_Dest_Addr_Control_written  );  
-   iCNT_H_Source_Adr_Control : entity work.eProcReg_gba generic map ( Reg_CNT_H_Source_Adr_Control ) port map  (clk100, gb_bus, CNT_H_Source_Adr_Control , CNT_H_Source_Adr_Control , CNT_H_Source_Adr_Control_written );  
-   iCNT_H_DMA_Repeat         : entity work.eProcReg_gba generic map ( Reg_CNT_H_DMA_Repeat         ) port map  (clk100, gb_bus, CNT_H_DMA_Repeat         , CNT_H_DMA_Repeat         , CNT_H_DMA_Repeat_written         );  
-   iCNT_H_DMA_Transfer_Type  : entity work.eProcReg_gba generic map ( Reg_CNT_H_DMA_Transfer_Type  ) port map  (clk100, gb_bus, CNT_H_DMA_Transfer_Type  , CNT_H_DMA_Transfer_Type  , CNT_H_DMA_Transfer_Type_written  );  
-   iCNT_H_DMA_Start_Timing   : entity work.eProcReg_gba generic map ( Reg_CNT_H_DMA_Start_Timing   ) port map  (clk100, gb_bus, CNT_H_DMA_Start_Timing   , CNT_H_DMA_Start_Timing   , CNT_H_DMA_Start_Timing_written   );  
-   iCNT_H_IRQ_on             : entity work.eProcReg_gba generic map ( Reg_CNT_H_IRQ_on             ) port map  (clk100, gb_bus, CNT_H_IRQ_on             , CNT_H_IRQ_on             , CNT_H_IRQ_on_written             );  
-   iCNT_H_DMA_Enable         : entity work.eProcReg_gba generic map ( Reg_CNT_H_DMA_Enable         ) port map  (clk100, gb_bus, Enable                   , CNT_H_DMA_Enable         , CNT_H_DMA_Enable_written         );  
+   iSAD                      : entity work.eProcReg_gba generic map ( Reg_SAD                      ) port map  (clk100, gb_bus, x"00000000"              , SAD                     );  
+   iDAD                      : entity work.eProcReg_gba generic map ( Reg_DAD                      ) port map  (clk100, gb_bus, x"00000000"              , DAD                     );  
+   iCNT_L                    : entity work.eProcReg_gba generic map ( Reg_CNT_L                    ) port map  (clk100, gb_bus, x"0000"                  , CNT_L                   );   
+   iCNT_H_Dest_Addr_Control  : entity work.eProcReg_gba generic map ( Reg_CNT_H_Dest_Addr_Control  ) port map  (clk100, gb_bus, CNT_H_Dest_Addr_Control  , CNT_H_Dest_Addr_Control );  
+   iCNT_H_Source_Adr_Control : entity work.eProcReg_gba generic map ( Reg_CNT_H_Source_Adr_Control ) port map  (clk100, gb_bus, CNT_H_Source_Adr_Control , CNT_H_Source_Adr_Control);  
+   iCNT_H_DMA_Repeat         : entity work.eProcReg_gba generic map ( Reg_CNT_H_DMA_Repeat         ) port map  (clk100, gb_bus, CNT_H_DMA_Repeat         , CNT_H_DMA_Repeat        );  
+   iCNT_H_DMA_Transfer_Type  : entity work.eProcReg_gba generic map ( Reg_CNT_H_DMA_Transfer_Type  ) port map  (clk100, gb_bus, CNT_H_DMA_Transfer_Type  , CNT_H_DMA_Transfer_Type );  
+   iCNT_H_DMA_Start_Timing   : entity work.eProcReg_gba generic map ( Reg_CNT_H_DMA_Start_Timing   ) port map  (clk100, gb_bus, CNT_H_DMA_Start_Timing   , CNT_H_DMA_Start_Timing  );  
+   iCNT_H_IRQ_on             : entity work.eProcReg_gba generic map ( Reg_CNT_H_IRQ_on             ) port map  (clk100, gb_bus, CNT_H_IRQ_on             , CNT_H_IRQ_on            );  
+   iCNT_H_DMA_Enable         : entity work.eProcReg_gba generic map ( Reg_CNT_H_DMA_Enable         ) port map  (clk100, gb_bus, Enable                   , CNT_H_DMA_Enable         , CNT_H_DMA_Enable_written);  
    
    dma_eepromcount <= fullcount;
    

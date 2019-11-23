@@ -50,18 +50,11 @@ architecture arch of gba_sound_ch1 is
    signal Channel_Length_Flag                : std_logic_vector(Reg_Length_Flag               .upper downto Reg_Length_Flag               .lower) := (others => '0');
    signal Channel_Initial                    : std_logic_vector(Reg_Initial                   .upper downto Reg_Initial                   .lower) := (others => '0');
    signal Channel_HighZero                   : std_logic_vector(Reg_HighZero                  .upper downto Reg_HighZero                  .lower) := (others => '0');
-
-   signal Channel_Number_of_sweep_shift_written       : std_logic;                                                                                                                                                      
-   signal Channel_Sweep_Frequency_Direction_written   : std_logic;                                                                                                                                                      
-   signal Channel_Sweep_Time_written                  : std_logic;                                                                                                                                                      
+                                                                                                                                                     
    signal Channel_Sound_length_written                : std_logic;                                                                                                                                                      
-   signal Channel_Wave_Pattern_Duty_written           : std_logic;                                                                                                                                                      
-   signal Channel_Envelope_Step_Time_written          : std_logic;                                                                                                                                                      
-   signal Channel_Envelope_Direction_written          : std_logic;                                                                                                                                                      
+   signal Channel_Wave_Pattern_Duty_written           : std_logic;                                                                                                                                                                                                                                                                                                            
    signal Channel_Initial_Volume_of_envelope_written  : std_logic;                                                                                                                                                      
-   signal Channel_Frequency_written                   : std_logic;                                                                                                                                                      
-   signal Channel_Length_Flag_written                 : std_logic;                                                                                                                                                      
-   signal Channel_Initial_written                     : std_logic;                                                                                                                                                                                                                                                                                                           
+   signal Channel_Frequency_written                   : std_logic;                                                                                                                                                                                                                                                                                                                                                                                                                                                               
                                                                                                                                                      
    signal wavetable_ptr : unsigned(2 downto 0)  := (others => '0');
    signal wavetable     : std_logic_vector(0 to 7)  := (others => '0');
@@ -91,19 +84,19 @@ begin
 
    gsweep : if has_sweep = true generate
    begin
-      iReg_Channel_Number_of_sweep_shift      : entity work.eProcReg_gba generic map ( Reg_Number_of_sweep_shift      ) port map  (clk100, gb_bus, Channel_Number_of_sweep_shift     , Channel_Number_of_sweep_shift     , Channel_Number_of_sweep_shift_written     );  
-      iReg_Channel_Sweep_Frequency_Direction  : entity work.eProcReg_gba generic map ( Reg_Sweep_Frequency_Direction  ) port map  (clk100, gb_bus, Channel_Sweep_Frequency_Direction , Channel_Sweep_Frequency_Direction , Channel_Sweep_Frequency_Direction_written );  
-      iReg_Channel_Sweep_Time                 : entity work.eProcReg_gba generic map ( Reg_Sweep_Time                 ) port map  (clk100, gb_bus, Channel_Sweep_Time                , Channel_Sweep_Time                , Channel_Sweep_Time_written                );  
+      iReg_Channel_Number_of_sweep_shift      : entity work.eProcReg_gba generic map ( Reg_Number_of_sweep_shift      ) port map  (clk100, gb_bus, Channel_Number_of_sweep_shift     , Channel_Number_of_sweep_shift     );  
+      iReg_Channel_Sweep_Frequency_Direction  : entity work.eProcReg_gba generic map ( Reg_Sweep_Frequency_Direction  ) port map  (clk100, gb_bus, Channel_Sweep_Frequency_Direction , Channel_Sweep_Frequency_Direction );  
+      iReg_Channel_Sweep_Time                 : entity work.eProcReg_gba generic map ( Reg_Sweep_Time                 ) port map  (clk100, gb_bus, Channel_Sweep_Time                , Channel_Sweep_Time                );  
    end generate;
    
    iReg_Channel_Sound_length               : entity work.eProcReg_gba generic map ( Reg_Sound_length               ) port map  (clk100, gb_bus, "000000"                          , Channel_Sound_length              , Channel_Sound_length_written              );  
    iReg_Channel_Wave_Pattern_Duty          : entity work.eProcReg_gba generic map ( Reg_Wave_Pattern_Duty          ) port map  (clk100, gb_bus, Channel_Wave_Pattern_Duty         , Channel_Wave_Pattern_Duty         , Channel_Wave_Pattern_Duty_written         );  
-   iReg_Channel_Envelope_Step_Time         : entity work.eProcReg_gba generic map ( Reg_Envelope_Step_Time         ) port map  (clk100, gb_bus, Channel_Envelope_Step_Time        , Channel_Envelope_Step_Time        , Channel_Envelope_Step_Time_written        );  
-   iReg_Channel_Envelope_Direction         : entity work.eProcReg_gba generic map ( Reg_Envelope_Direction         ) port map  (clk100, gb_bus, Channel_Envelope_Direction        , Channel_Envelope_Direction        , Channel_Envelope_Direction_written        );  
+   iReg_Channel_Envelope_Step_Time         : entity work.eProcReg_gba generic map ( Reg_Envelope_Step_Time         ) port map  (clk100, gb_bus, Channel_Envelope_Step_Time        , Channel_Envelope_Step_Time        );  
+   iReg_Channel_Envelope_Direction         : entity work.eProcReg_gba generic map ( Reg_Envelope_Direction         ) port map  (clk100, gb_bus, Channel_Envelope_Direction        , Channel_Envelope_Direction        );  
    iReg_Channel_Initial_Volume_of_envelope : entity work.eProcReg_gba generic map ( Reg_Initial_Volume_of_envelope ) port map  (clk100, gb_bus, Channel_Initial_Volume_of_envelope, Channel_Initial_Volume_of_envelope, Channel_Initial_Volume_of_envelope_written);  
    iReg_Channel_Frequency                  : entity work.eProcReg_gba generic map ( Reg_Frequency                  ) port map  (clk100, gb_bus, "00000000000"                     , Channel_Frequency                 , Channel_Frequency_written                 );  
-   iReg_Channel_Length_Flag                : entity work.eProcReg_gba generic map ( Reg_Length_Flag                ) port map  (clk100, gb_bus, Channel_Length_Flag               , Channel_Length_Flag               , Channel_Length_Flag_written               );  
-   iReg_Channel_Initial                    : entity work.eProcReg_gba generic map ( Reg_Initial                    ) port map  (clk100, gb_bus, "0"                               , Channel_Initial                   , Channel_Initial_written                   );  
+   iReg_Channel_Length_Flag                : entity work.eProcReg_gba generic map ( Reg_Length_Flag                ) port map  (clk100, gb_bus, Channel_Length_Flag               , Channel_Length_Flag               );  
+   iReg_Channel_Initial                    : entity work.eProcReg_gba generic map ( Reg_Initial                    ) port map  (clk100, gb_bus, "0"                               , Channel_Initial                   );  
    iReg_Channel_HighZero                   : entity work.eProcReg_gba generic map ( Reg_HighZero                   ) port map  (clk100, gb_bus, Channel_HighZero);   
   
    process (clk100)
@@ -242,9 +235,9 @@ begin
          -- sound out
          if (ch_on = '1') then
             if (wave_on = '1') then
-               sound_out <= to_signed(128 * volume, 16);
+               sound_out <= to_signed(1 * volume, 16);
             else
-               sound_out <= to_signed(-128 * volume, 16);
+               sound_out <= to_signed(-1 * volume, 16);
             end if;
          else
             sound_out <= (others => '0');
