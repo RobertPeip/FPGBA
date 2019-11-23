@@ -139,6 +139,7 @@ architecture arch of gba_memorymux is
    signal rotate_data        : std_logic_vector(31 downto 0) := (others => '0');
       
    signal bios_data          : std_logic_vector(31 downto 0);
+   signal bios_data_last     : std_logic_vector(31 downto 0) := (others => '0');
                              
    signal smallram_addr_r    : integer range 0 to 8191 := 0;
    signal smallram_addr_w    : integer range 0 to 8191 := 0;
@@ -327,7 +328,9 @@ begin
                            when x"0" => 
                               if (PC_in_BIOS = '0') then
                                  if (unsigned(mem_bus_Adr) < 16#400#) then
-                                    rotate_data <= x"E3A02004"; -- only applies for one situation!
+                                    --rotate_data <= x"E3A02004"; -- only applies for one situation!
+                                    --rotate_data <= x"E55EC002"; -- only applies for one situation!
+                                    rotate_data <= bios_data_last;
                                     state       <= ROTATE;
                                  else
                                     state <= READ_UNREADABLE;
@@ -460,8 +463,9 @@ begin
             -- reading
                
             when READBIOS => 
-               rotate_data <= bios_data;
-               state       <= ROTATE;
+               rotate_data    <= bios_data;
+               bios_data_last <= bios_data;
+               state          <= ROTATE;
                
             when READSMALLRAM =>
                rotate_data  <= smallram_DataOut;
