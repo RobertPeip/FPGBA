@@ -10,16 +10,19 @@ entity gba_drawer_mode0 is
       drawline             : in  std_logic;
       busy                 : out std_logic := '0';
       
-      ypos                 : in  unsigned(7 downto 0);
+      ypos                 : in  integer range 0 to 159;
+      ypos_mosaic          : in  integer range 0 to 159;
       mapbase              : in  unsigned(4 downto 0);
       tilebase             : in  unsigned(1 downto 0);
       hicolor              : in  std_logic;
+      mosaic               : in  std_logic;
+      Mosaic_H_Size        : in  unsigned(3 downto 0);
       screensize           : in  unsigned(1 downto 0);
       scrollX              : in  unsigned(8 downto 0);
       scrollY              : in  unsigned(8 downto 0);
       
       pixel_we             : out std_logic := '0';
-      pixeldata            : out std_logic_vector(15 downto 0) := (others => '0');
+      pixeldata            : buffer std_logic_vector(15 downto 0) := (others => '0');
       pixel_x              : out integer range 0 to 239;
       
       PALETTE_Drawer_addr  : out integer range 0 to 127;
@@ -85,6 +88,8 @@ architecture arch of gba_drawer_mode0 is
 
    signal colordata        : std_logic_vector(7 downto 0) := (others => '0');
    
+   signal mosaik_cnt       : integer range 0 to 15 := 0;
+   
 begin 
 
    mapbaseaddr  <= to_integer(mapbase) * 2048;
@@ -107,7 +112,11 @@ begin
                if (drawline = '1') then
                   busy         <= '1';
                   vramfetch    <= CALCBASE;
-                  y_scrolled   <= to_integer(ypos) + to_integer(scrollY);
+                  if (mosaic = '1') then
+                     y_scrolled <= ypos_mosaic + to_integer(scrollY);
+                  else
+                     y_scrolled <= ypos + to_integer(scrollY);
+                  end if;
                   offset_y     <= 32;
                   scroll_x_mod <= 256;
                   scroll_y_mod <= 256;
@@ -244,31 +253,48 @@ begin
          vram_data_ack <= '0';
          pixel_we      <= '0';
       
+         if (drawline = '1') then
+            mosaik_cnt    <= 15;  -- first pixel must fetch new data
+            pixeldata(15) <= '1';
+         end if;
+      
          case (palettefetch) is
          
             when IDLE =>
                if (vramfetch = FETCHDONE and vram_data_ack = '0') then
+               
                   vram_data_ack    <= '1';
-                  palettefetch     <= STARTREAD; 
                   pixel_x          <= x_cnt;
-                  if (hicolor = '0') then
-                     if ((tileinfo(10) = '1' and (x_scrolled mod 2) = 0) or (tileinfo(10) = '0' and (x_scrolled mod 2) = 1)) then
-                        PALETTE_byteaddr <= tileinfo(15 downto 12) & colordata(7 downto 4) & '0';
-                        if (colordata(7 downto 4) = x"0") then -- transparent
-                           palettefetch <= IDLE;
+               
+                  if (mosaik_cnt < Mosaic_H_Size and mosaic = '1') then
+                     mosaik_cnt <= mosaik_cnt + 1;
+                     pixel_we   <= not pixeldata(15);
+                  else
+                     mosaik_cnt       <= 0;
+                     
+                     palettefetch     <= STARTREAD; 
+                     if (hicolor = '0') then
+                        if ((tileinfo(10) = '1' and (x_scrolled mod 2) = 0) or (tileinfo(10) = '0' and (x_scrolled mod 2) = 1)) then
+                           PALETTE_byteaddr <= tileinfo(15 downto 12) & colordata(7 downto 4) & '0';
+                           if (colordata(7 downto 4) = x"0") then -- transparent
+                              palettefetch  <= IDLE;
+                              pixeldata(15) <= '1';
+                           end if;
+                        else
+                           PALETTE_byteaddr <= tileinfo(15 downto 12) & colordata(3 downto 0) & '0';
+                           if (colordata(3 downto 0) = x"0") then -- transparent
+                              palettefetch  <= IDLE;
+                              pixeldata(15) <= '1';
+                           end if;
                         end if;
                      else
-                        PALETTE_byteaddr <= tileinfo(15 downto 12) & colordata(3 downto 0) & '0';
-                        if (colordata(3 downto 0) = x"0") then -- transparent
-                           palettefetch <= IDLE;
+                        PALETTE_byteaddr <= colordata & '0';
+                        if (colordata = x"00") then -- transparent
+                           palettefetch  <= IDLE;
+                           pixeldata(15) <= '1';
                         end if;
                      end if;
-                  else
-                     PALETTE_byteaddr <= colordata & '0';
-                     if (colordata = x"00") then -- transparent
-                        palettefetch <= IDLE;
-                     end if;
-                  end if;  
+                  end if;
                end if;
                
             when STARTREAD => 

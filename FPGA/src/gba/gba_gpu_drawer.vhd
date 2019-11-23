@@ -232,6 +232,8 @@ architecture arch of gba_gpu_drawer is
    signal VRAM_Drawer_cnt_Hi   : std_logic := '0';
    
    -- background multiplexing
+   signal drawline_1       : std_logic := '0';
+   
    signal drawline_mode0_0 : std_logic;
    signal drawline_mode0_1 : std_logic;
    signal drawline_mode0_2 : std_logic;
@@ -316,54 +318,61 @@ architecture arch of gba_gpu_drawer is
    signal busy_allmod   : std_logic_vector(7 downto 0);
    
    -- linebuffers
-   signal clear_enable          : std_logic := '0';
-   signal clear_addr            : integer range 0 to 239;
-   signal clear_trigger         : std_logic := '0';
-   signal clear_trigger_1       : std_logic := '0';
+   signal clear_enable           : std_logic := '0';
+   signal clear_addr             : integer range 0 to 239;
+   signal clear_trigger          : std_logic := '0';
+   signal clear_trigger_1        : std_logic := '0';
+                                 
+   signal linecounter_int        : integer range 0 to 159;
+   signal linebuffer_addr        : integer range 0 to 239;
+   signal linebuffer_addr_1      : integer range 0 to 239;
    
-   signal linecounter_int       : integer range 0 to 159;
-   signal linebuffer_addr       : integer range 0 to 239;
-   signal linebuffer_addr_1     : integer range 0 to 239;
-   
-   signal linebuffer_bg0_data   : std_logic_vector(15 downto 0);
-   signal linebuffer_bg1_data   : std_logic_vector(15 downto 0);
-   signal linebuffer_bg2_data   : std_logic_vector(15 downto 0);
-   signal linebuffer_bg3_data   : std_logic_vector(15 downto 0);
-   signal linebuffer_obj_data   : std_logic_vector(18 downto 0);
-   
-   signal linebuffer_objwindow  : std_logic_vector(0 to 239) := (others => '0');
-                                
-   -- merge_pixel
-   signal pixeldata_back        : std_logic_vector(15 downto 0) := (others => '0');
-   signal allow_start           : std_logic := '1';
-   signal merge_line            : std_logic := '0';
-   signal merge_enable          : std_logic := '0';
-   signal merge_enable_1        : std_logic := '0';
-   signal merge_pixeldata_out   : std_logic_vector(15 downto 0);
-   signal merge_pixel_x         : integer range 0 to 239;
-   signal merge_pixel_y         : integer range 0 to 159;
-   signal merge_pixel_we        : std_logic := '0';
-   signal objwindow_merge_in    : std_logic := '0';
-   
-   signal pixelout_addr         : integer range 0 to 38399;
-   signal merge_pixel_we_1      : std_logic := '0';
-   signal merge_pixeldata_out_1 : std_logic_vector(15 downto 0);
-   
-   signal lineUpToDate          : std_logic_vector(0 to 159) := (others => '0');
-   signal linesDrawn            : integer range 0 to 160 := 0;
-   signal nextLineDrawn         : std_logic := '0';
-   signal nextLineCounter       : integer range 0 to 159 := 0;
+   signal linebuffer_bg0_data    : std_logic_vector(15 downto 0);
+   signal linebuffer_bg1_data    : std_logic_vector(15 downto 0);
+   signal linebuffer_bg2_data    : std_logic_vector(15 downto 0);
+   signal linebuffer_bg3_data    : std_logic_vector(15 downto 0);
+   signal linebuffer_obj_data    : std_logic_vector(18 downto 0);
+                                 
+   signal linebuffer_objwindow   : std_logic_vector(0 to 239) := (others => '0');
+                                 
+   -- merge_pixel                
+   signal pixeldata_back         : std_logic_vector(15 downto 0) := (others => '0');
+   signal allow_start            : std_logic := '1';
+   signal merge_line             : std_logic := '0';
+   signal merge_enable           : std_logic := '0';
+   signal merge_enable_1         : std_logic := '0';
+   signal merge_pixeldata_out    : std_logic_vector(15 downto 0);
+   signal merge_pixel_x          : integer range 0 to 239;
+   signal merge_pixel_y          : integer range 0 to 159;
+   signal merge_pixel_we         : std_logic := '0';
+   signal objwindow_merge_in     : std_logic := '0';
+                                 
+   signal pixelout_addr          : integer range 0 to 38399;
+   signal merge_pixel_we_1       : std_logic := '0';
+   signal merge_pixeldata_out_1  : std_logic_vector(15 downto 0);
+                                 
+   signal lineUpToDate           : std_logic_vector(0 to 159) := (others => '0');
+   signal linesDrawn             : integer range 0 to 160 := 0;
+   signal nextLineDrawn          : std_logic := '0';
+   signal nextLineCounter        : integer range 0 to 159 := 0;
    
    -- affine + mosaik
-    signal ref2_x : signed(27 downto 0) := (others => '0'); 
-    signal ref2_y : signed(27 downto 0) := (others => '0'); 
-    signal ref3_x : signed(27 downto 0) := (others => '0'); 
-    signal ref3_y : signed(27 downto 0) := (others => '0'); 
+   signal ref2_x : signed(27 downto 0) := (others => '0'); 
+   signal ref2_y : signed(27 downto 0) := (others => '0'); 
+   signal ref3_x : signed(27 downto 0) := (others => '0'); 
+   signal ref3_y : signed(27 downto 0) := (others => '0'); 
+   
+   signal mosaik_vcnt_bg  : integer range 0 to 15 := 0;
+   signal mosaik_vcnt_obj : integer range 0 to 15 := 0;
+       
+   signal linecounter_mosaic_bg  : integer range 0 to 239;
+   signal linecounter_mosaic_obj : integer range 0 to 239;
+   
+   signal mosaic_ref2_x : signed(27 downto 0) := (others => '0'); 
+   signal mosaic_ref2_y : signed(27 downto 0) := (others => '0'); 
+   signal mosaic_ref3_x : signed(27 downto 0) := (others => '0'); 
+   signal mosaic_ref3_y : signed(27 downto 0) := (others => '0'); 
     
-    signal mosaik_bg0_vcnt : integer range 0 to 15;
-    signal mosaik_bg1_vcnt : integer range 0 to 15;
-    signal mosaik_bg2_vcnt : integer range 0 to 15;
-    signal mosaik_bg3_vcnt : integer range 0 to 15;
    
 begin 
    
@@ -673,10 +682,13 @@ begin
       clk100               => clk100,
       drawline             => drawline_mode0_0,
       busy                 => busy_mode0_0,
-      ypos                 => linecounter,
+      ypos                 => linecounter_int,
+      ypos_mosaic          => linecounter_mosaic_bg,
       mapbase              => unsigned(REG_BG0CNT_Screen_Base_Block),
       tilebase             => unsigned(REG_BG0CNT_Character_Base_Block),
       hicolor              => REG_BG0CNT_Colors_Palettes(REG_BG0CNT_Colors_Palettes'left),
+      mosaic               => REG_BG0CNT_Mosaic(REG_BG0CNT_Mosaic'left),
+      Mosaic_H_Size        => unsigned(REG_MOSAIC_BG_Mosaic_H_Size),
       screensize           => unsigned(REG_BG0CNT_Screen_Size),
       scrollX              => unsigned(REG_BG0HOFS(8 downto 0)),
       scrollY              => unsigned(REG_BG0VOFS(24 downto 16)),
@@ -697,10 +709,13 @@ begin
       clk100               => clk100,
       drawline             => drawline_mode0_1,
       busy                 => busy_mode0_1,
-      ypos                 => linecounter,
+      ypos                 => linecounter_int,
+      ypos_mosaic          => linecounter_mosaic_bg,
       mapbase              => unsigned(REG_BG1CNT_Screen_Base_Block),
       tilebase             => unsigned(REG_BG1CNT_Character_Base_Block),
       hicolor              => REG_BG1CNT_Colors_Palettes(REG_BG1CNT_Colors_Palettes'left),
+      mosaic               => REG_BG1CNT_Mosaic(REG_BG1CNT_Mosaic'left),
+      Mosaic_H_Size        => unsigned(REG_MOSAIC_BG_Mosaic_H_Size),
       screensize           => unsigned(REG_BG1CNT_Screen_Size),
       scrollX              => unsigned(REG_BG1HOFS(8 downto 0)),
       scrollY              => unsigned(REG_BG1VOFS(24 downto 16)),
@@ -721,10 +736,13 @@ begin
       clk100               => clk100,
       drawline             => drawline_mode0_2,
       busy                 => busy_mode0_2,
-      ypos                 => linecounter,
+      ypos                 => linecounter_int,
+      ypos_mosaic          => linecounter_mosaic_bg,
       mapbase              => unsigned(REG_BG2CNT_Screen_Base_Block),
       tilebase             => unsigned(REG_BG2CNT_Character_Base_Block),
       hicolor              => REG_BG2CNT_Colors_Palettes(REG_BG2CNT_Colors_Palettes'left),
+      mosaic               => REG_BG2CNT_Mosaic(REG_BG2CNT_Mosaic'left),
+      Mosaic_H_Size        => unsigned(REG_MOSAIC_BG_Mosaic_H_Size),
       screensize           => unsigned(REG_BG2CNT_Screen_Size),
       scrollX              => unsigned(REG_BG2HOFS(8 downto 0)),
       scrollY              => unsigned(REG_BG2VOFS(24 downto 16)),
@@ -745,10 +763,13 @@ begin
       clk100               => clk100,
       drawline             => drawline_mode0_3,
       busy                 => busy_mode0_3,
-      ypos                 => linecounter,
+      ypos                 => linecounter_int,
+      ypos_mosaic          => linecounter_mosaic_bg,
       mapbase              => unsigned(REG_BG3CNT_Screen_Base_Block),
       tilebase             => unsigned(REG_BG3CNT_Character_Base_Block),
       hicolor              => REG_BG3CNT_Colors_Palettes(REG_BG3CNT_Colors_Palettes'left),
+      mosaic               => REG_BG3CNT_Mosaic(REG_BG3CNT_Mosaic'left),
+      Mosaic_H_Size        => unsigned(REG_MOSAIC_BG_Mosaic_H_Size),
       screensize           => unsigned(REG_BG3CNT_Screen_Size),
       scrollX              => unsigned(REG_BG3HOFS(8 downto 0)),
       scrollY              => unsigned(REG_BG3VOFS(24 downto 16)),
@@ -773,8 +794,12 @@ begin
       tilebase             => unsigned(REG_BG2CNT_Character_Base_Block),
       screensize           => unsigned(REG_BG2CNT_Screen_Size),
       wrapping             => REG_BG2CNT_Display_Area_Overflow(REG_BG2CNT_Display_Area_Overflow'left),
+      mosaic               => REG_BG2CNT_Mosaic(REG_BG2CNT_Mosaic'left),
+      Mosaic_H_Size        => unsigned(REG_MOSAIC_BG_Mosaic_H_Size),
       refX                 => ref2_x,
       refY                 => ref2_y,
+      refX_mosaic          => mosaic_ref2_x,
+      refY_mosaic          => mosaic_ref2_y,
       dx                   => signed(REG_BG2RotScaleParDX),
       dy                   => signed(REG_BG2RotScaleParDY),  
       pixel_we             => pixel_we_mode2_2,
@@ -798,8 +823,12 @@ begin
       tilebase             => unsigned(REG_BG3CNT_Character_Base_Block),
       screensize           => unsigned(REG_BG3CNT_Screen_Size),
       wrapping             => REG_BG3CNT_Display_Area_Overflow(REG_BG3CNT_Display_Area_Overflow'left),
+      mosaic               => REG_BG2CNT_Mosaic(REG_BG2CNT_Mosaic'left),
+      Mosaic_H_Size        => unsigned(REG_MOSAIC_BG_Mosaic_H_Size),
       refX                 => ref3_x,
       refY                 => ref3_y,
+      refX_mosaic          => mosaic_ref3_x,
+      refY_mosaic          => mosaic_ref3_y,
       dx                   => signed(REG_BG3RotScaleParDX),
       dy                   => signed(REG_BG3RotScaleParDY),  
       pixel_we             => pixel_we_mode2_3,
@@ -821,8 +850,12 @@ begin
       busy                 => busy_mode345,
       BG_Mode              => BG_Mode,
       second_frame         => REG_DISPCNT_Display_Frame_Select(REG_DISPCNT_Display_Frame_Select'left),
+      mosaic               => REG_BG2CNT_Mosaic(REG_BG2CNT_Mosaic'left),
+      Mosaic_H_Size        => unsigned(REG_MOSAIC_BG_Mosaic_H_Size),
       refX                 => ref2_x,
       refY                 => ref2_y,
+      refX_mosaic          => mosaic_ref2_x,
+      refY_mosaic          => mosaic_ref2_y,
       dx                   => signed(REG_BG2RotScaleParDX),
       dy                   => signed(REG_BG2RotScaleParDY),  
       pixel_we             => pixel_we_mode345,
@@ -849,10 +882,10 @@ begin
       
       drawline             => drawline_obj,
       ypos                 => linecounter_int,
+      ypos_mosaic          => linecounter_mosaic_obj,
       
       one_dim_mapping      => REG_DISPCNT_OBJ_Char_VRAM_Map(REG_DISPCNT_OBJ_Char_VRAM_Map'left),
-      mosaic_h             => unsigned(REG_MOSAIC_OBJ_Mosaic_H_Size),
-      mosaic_v             => unsigned(REG_MOSAIC_OBJ_Mosaic_V_Size),
+      Mosaic_H_Size        => unsigned(REG_MOSAIC_OBJ_Mosaic_H_Size),
       
       pixel_we             => pixel_we_modeobj,
       pixeldata            => pixeldata_modeobj,
@@ -872,14 +905,14 @@ begin
    
    
    -- todo: for backgrounds: if (!mosaic_on || mosaik_bg0_vcnt == 0)
-   drawline_mode0_0 <= Screen_Display_BG0(Screen_Display_BG0'left) and drawline and allow_start and (not nextLineDrawn) when BG_Mode = "000" or BG_Mode = "001" else '0';
-   drawline_mode0_1 <= Screen_Display_BG1(Screen_Display_BG1'left) and drawline and allow_start and (not nextLineDrawn) when BG_Mode = "000" or BG_Mode = "001" else '0';
-   drawline_mode0_2 <= Screen_Display_BG2(Screen_Display_BG2'left) and drawline and allow_start and (not nextLineDrawn) when BG_Mode = "000" else '0';
-   drawline_mode0_3 <= Screen_Display_BG3(Screen_Display_BG3'left) and drawline and allow_start and (not nextLineDrawn) when BG_Mode = "000" else '0';
-   drawline_mode2_2 <= Screen_Display_BG2(Screen_Display_BG2'left) and drawline and allow_start and (not nextLineDrawn) when BG_Mode = "001" or BG_Mode = "010" else '0';
-   drawline_mode2_3 <= Screen_Display_BG3(Screen_Display_BG3'left) and drawline and allow_start and (not nextLineDrawn) when BG_Mode = "010" else '0';
-   drawline_mode345 <= Screen_Display_BG2(Screen_Display_BG2'left) and drawline and allow_start and (not nextLineDrawn) when BG_Mode = "011" or BG_Mode = "100" or BG_Mode = "101" else '0';
-   drawline_obj     <= Screen_Display_OBJ(Screen_Display_OBJ'left) and drawline and allow_start and (not nextLineDrawn);
+   drawline_mode0_0 <= Screen_Display_BG0(Screen_Display_BG0'left) and drawline_1 and allow_start and (not nextLineDrawn) when BG_Mode = "000" or BG_Mode = "001" else '0';
+   drawline_mode0_1 <= Screen_Display_BG1(Screen_Display_BG1'left) and drawline_1 and allow_start and (not nextLineDrawn) when BG_Mode = "000" or BG_Mode = "001" else '0';
+   drawline_mode0_2 <= Screen_Display_BG2(Screen_Display_BG2'left) and drawline_1 and allow_start and (not nextLineDrawn) when BG_Mode = "000" else '0';
+   drawline_mode0_3 <= Screen_Display_BG3(Screen_Display_BG3'left) and drawline_1 and allow_start and (not nextLineDrawn) when BG_Mode = "000" else '0';
+   drawline_mode2_2 <= Screen_Display_BG2(Screen_Display_BG2'left) and drawline_1 and allow_start and (not nextLineDrawn) when BG_Mode = "001" or BG_Mode = "010" else '0';
+   drawline_mode2_3 <= Screen_Display_BG3(Screen_Display_BG3'left) and drawline_1 and allow_start and (not nextLineDrawn) when BG_Mode = "010" else '0';
+   drawline_mode345 <= Screen_Display_BG2(Screen_Display_BG2'left) and drawline_1 and allow_start and (not nextLineDrawn) when BG_Mode = "011" or BG_Mode = "100" or BG_Mode = "101" else '0';
+   drawline_obj     <= Screen_Display_OBJ(Screen_Display_OBJ'left) and drawline_1 and allow_start and (not nextLineDrawn);
 
    PALETTE_BG_Drawer_addr0 <= PALETTE_Drawer_addr_mode0_0;
    PALETTE_BG_Drawer_addr1 <= PALETTE_Drawer_addr_mode0_1;
@@ -1141,6 +1174,8 @@ begin
          
          nextLineDrawn <= lineUpToDate(nextLineCounter);
 
+         drawline_1 <= drawline;
+
          if (vblank_trigger = '1') then
             if (linesDrawn = 160) then
                lineUpToDate <= (others => '0');
@@ -1148,23 +1183,21 @@ begin
             end if;
             nextLineCounter <= 0;
             linesDrawn      <= 0;
-         elsif (drawline = '1' and nextLineCounter < 159) then
+         elsif (drawline_1 = '1' and nextLineCounter < 159) then
             nextLineCounter <= nextLineCounter + 1;
          end if;  
 
-         if (drawline = '1' and nextLineDrawn = '1') then
+         if (drawline_1 = '1' and nextLineDrawn = '1') then
             linesDrawn <= linesDrawn + 1;
          end if;
          
-         if (drawline = '1' and busy_allmod = x"00" and allow_start = '1' and nextLineDrawn = '0') then
+         if (drawline_1 = '1' and busy_allmod = x"00" and allow_start = '1' and nextLineDrawn = '0') then
             linebuffer_addr      <= 0;
             merge_enable         <= '0';
-            linecounter_int      <= to_integer(linecounter);
             linebuffer_objwindow <= (others => '0');
             allow_start          <= '0';
             linesDrawn           <= linesDrawn + 1;
             lineUpToDate(nextLineCounter) <= '1';
-            
             merge_line <= '0';
             if (draw_allmod /= x"00") then
                merge_line <= '1';
@@ -1287,10 +1320,10 @@ begin
    begin
       if rising_edge(clk100) then
 
-         if (refpoint_update = '1' or ref2_x_written = '1') then ref2_x <= signed(REG_BG2RefX); end if;
-         if (refpoint_update = '1' or ref2_y_written = '1') then ref2_y <= signed(REG_BG2RefY); end if;
-         if (refpoint_update = '1' or ref3_x_written = '1') then ref3_x <= signed(REG_BG3RefX); end if;
-         if (refpoint_update = '1' or ref3_y_written = '1') then ref3_y <= signed(REG_BG3RefY); end if;
+         if (refpoint_update = '1' or ref2_x_written = '1') then ref2_x <= signed(REG_BG2RefX); mosaic_ref2_x <= signed(REG_BG2RefX); end if;
+         if (refpoint_update = '1' or ref2_y_written = '1') then ref2_y <= signed(REG_BG2RefY); mosaic_ref2_y <= signed(REG_BG2RefY); end if;
+         if (refpoint_update = '1' or ref3_x_written = '1') then ref3_x <= signed(REG_BG3RefX); mosaic_ref3_x <= signed(REG_BG3RefX); end if;
+         if (refpoint_update = '1' or ref3_y_written = '1') then ref3_y <= signed(REG_BG3RefY); mosaic_ref3_y <= signed(REG_BG3RefY); end if;
 
          if (hblank_trigger = '1') then
             if (BG_Mode /= "000" and Screen_Display_BG2 = "1") then
@@ -1303,12 +1336,35 @@ begin
             end if;
          end if;
          
-         --if (drawline = '1' and linecounter = 0) then
-         --   mosaik_bg0_vcnt <= 0;
-         --   mosaik_bg1_vcnt <= 0;
-         --   mosaik_bg2_vcnt <= 0;
-         --   mosaik_bg3_vcnt <= 0;
-         --end if;
+         if (vblank_trigger = '1') then
+            mosaik_vcnt_bg         <= 0;
+            mosaik_vcnt_obj        <= 0;
+            linecounter_mosaic_bg  <= 0;
+            linecounter_mosaic_obj <= 0;
+         elsif (drawline = '1') then
+            linecounter_int <= to_integer(linecounter);
+            
+            -- background
+            if (mosaik_vcnt_bg < unsigned(REG_MOSAIC_BG_Mosaic_V_Size)) then
+               mosaik_vcnt_bg <= mosaik_vcnt_bg + 1;
+            else
+               mosaik_vcnt_bg        <= 0;
+               linecounter_mosaic_bg <= to_integer(linecounter);
+               mosaic_ref2_x         <= ref2_x;
+               mosaic_ref2_y         <= ref2_y;
+               mosaic_ref3_x         <= ref3_x;
+               mosaic_ref3_y         <= ref3_y;
+            end if;
+            
+            -- sprite
+            if (mosaik_vcnt_obj < unsigned(REG_MOSAIC_OBJ_Mosaic_V_Size)) then
+               mosaik_vcnt_obj <= mosaik_vcnt_obj + 1;
+            else
+               mosaik_vcnt_obj        <= 0;
+               linecounter_mosaic_obj <= to_integer(linecounter);
+            end if;
+
+         end if;
 
       end if;
    end process;

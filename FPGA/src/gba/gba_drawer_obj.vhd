@@ -12,10 +12,10 @@ entity gba_drawer_obj is
       
       drawline             : in  std_logic;
       ypos                 : in  integer range 0 to 159;
+      ypos_mosaic          : in  integer range 0 to 159;
       
       one_dim_mapping      : in  std_logic;
-      mosaic_h             : in  unsigned(3 downto 0);
-      mosaic_v             : in  unsigned(3 downto 0);
+      Mosaic_H_Size        : in  unsigned(3 downto 0);
       
       pixel_we             : out std_logic := '0';
       pixeldata            : out std_logic_vector(18 downto 0) := (others => '0');
@@ -120,7 +120,6 @@ architecture arch of gba_drawer_obj is
    signal sizeY             : integer range 8 to 64;
    signal fieldX            : integer range 8 to 128;
    signal fieldY            : integer range 8 to 128;
-   signal mosaic_v_plus1    : integer range 0 to 16;
    signal pixeladdr_pre     : integer range 0 to 32767;
    signal pixeladdr         : integer range -32768 to 32767;
        
@@ -205,6 +204,11 @@ architecture arch of gba_drawer_obj is
    signal affine_eval       : std_logic;
    signal hflip_eval        : std_logic;
    signal palette_eval      : std_logic_vector(3 downto 0);
+   signal mosaic_eval       : std_logic;
+   signal mosaic_wait       : std_logic;
+   
+   signal mosaik_cnt        : integer range 0 to 15 := 0;
+   signal mosaik_merge      : std_logic;
    
 begin 
 
@@ -332,14 +336,18 @@ begin
                   dmy             <= to_integer(signed(OAM_data_aff3));
                   
                   posy := to_integer(unsigned(OAM_data0(OAM_Y_HI downto OAM_Y_LO)));
-                  if (posy > 16#C0#) then posy := posy - 16#100#; end if;
-                  ty <= ypos - posy;
+                  if (posy > 16#C0#) then 
+                     posy := posy - 16#100#; 
+                  end if;
+                  if (OAM_data0(OAM_MOSAIC) = '1') then
+                     ty <= ypos_mosaic - posy;
+                  else
+                     ty <= ypos - posy;
+                  end if;
                   
                   posx <= to_integer(unsigned(OAM_data1(OAM_X_HI downto OAM_X_LO)));
                   
                   pixeladdr_pre <= 32 * to_integer(unsigned(OAM_data2(OAM_TILE_HI downto OAM_TILE_LO)));
-                  
-                  --mosaic_v_plus1 <= to_integer(mosaic_v) + 1;
                   
                   case (to_integer(unsigned(OAM_data0(OAM_OBJSHAPE_HI downto OAM_OBJSHAPE_LO)))) is
                      when 0 => -- square
@@ -403,10 +411,6 @@ begin
                else
                   sizemult <= sizeX * 8;
                end if;
-               
-               --if (Pixel_data0(OAM_MOSAIC) = '1') then
-                  --ty <= ty mod mosaic_v_plus1;
-               --end if;
                
             when BASEADDR_PRE =>
                if (ty < 0 or ty >= fieldY) then -- not in current line -> skip
@@ -586,9 +590,7 @@ begin
       if rising_edge(clk100) then
       
          if (hblank = '1') then
-         
             pixelarray <= (others => ('1', "11", '0', '0'));
-            
          end if;
          
          -- zero cycle - address for vram is written in this cycle
@@ -610,10 +612,12 @@ begin
          affine_eval     <= Pixel_data0(OAM_AFFINE);
          hflip_eval      <= Pixel_data1(OAM_HFLIP);
          palette_eval    <= Pixel_data2(OAM_PALETTE_HI downto OAM_PALETTE_LO);
+         mosaic_eval     <= Pixel_data0(OAM_MOSAIC);
 
          -- second cycle - eval vram
          target_wait <= target_eval;
          enable_wait <= enable_eval;
+         mosaic_wait <= mosaic_eval;
          
          Pixel_wait.prio        <= prio_eval;
          if (mode_eval= "01") then Pixel_wait.alpha  <= '1'; else Pixel_wait.alpha  <= '0'; end if;
@@ -657,21 +661,38 @@ begin
             end if;
          end if;
          
-         -- third cycle - wait palette
-         Pixel_readback <= pixelarray(target_wait);
-         Pixel_merge    <= Pixel_wait;
-         target_merge   <= target_wait;
+         -- third cycle - wait palette + mosaic
          enable_merge   <= enable_wait;
+         target_merge   <= target_wait;
+         Pixel_readback <= pixelarray(target_wait);
+         
+         -- reset mosaic for each line and each sprite turning mosaic it off, maybe needs to reset for each new sprite...
+         if (drawline = '1' or mosaic_wait = '0') then 
+            mosaik_cnt <= 15;
+         end if;
+         
+         mosaik_merge <= '0';
+         if (enable_wait = '1') then
+            if (mosaik_cnt < Mosaic_H_Size and mosaic_wait = '1') then
+               mosaik_cnt   <= mosaik_cnt + 1;
+               mosaik_merge <= '1';
+            else
+               mosaik_cnt  <= 0;
+               Pixel_merge <= Pixel_wait;
+            end if;
+         end if;   
          
          -- fourth cycle
          pixel_we     <= '0';
          pixel_objwnd <= '0';
          pixel_x      <= target_merge;
          
-         if (PALETTE_byteaddr(1) = '1') then
-            pixeldata <= Pixel_merge.prio & Pixel_merge.alpha & '0' & PALETTE_Drawer_data(30 downto 16);
-         else
-            pixeldata <= Pixel_merge.prio & Pixel_merge.alpha & '0' & PALETTE_Drawer_data(14 downto 0);
+         if (enable_merge = '1' and mosaik_merge = '0') then
+            if (PALETTE_byteaddr(1) = '1') then
+               pixeldata <= Pixel_merge.prio & Pixel_merge.alpha & '0' & PALETTE_Drawer_data(30 downto 16);
+            else
+               pixeldata <= Pixel_merge.prio & Pixel_merge.alpha & '0' & PALETTE_Drawer_data(14 downto 0);
+            end if;
          end if;
          
          if (enable_merge = '1' and output_ok = '1') then

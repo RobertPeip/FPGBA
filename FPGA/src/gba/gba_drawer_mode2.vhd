@@ -14,13 +14,17 @@ entity gba_drawer_mode2 is
       tilebase             : in  unsigned(1 downto 0);
       screensize           : in  unsigned(1 downto 0);
       wrapping             : in  std_logic;
+      mosaic               : in  std_logic;
+      Mosaic_H_Size        : in  unsigned(3 downto 0);
       refX                 : in  signed(27 downto 0);
-      refY                 : in  signed(27 downto 0);
+      refY                 : in  signed(27 downto 0);      
+      refX_mosaic          : in  signed(27 downto 0);
+      refY_mosaic          : in  signed(27 downto 0);
       dx                   : in  signed(15 downto 0);
       dy                   : in  signed(15 downto 0);
       
       pixel_we             : out std_logic := '0';
-      pixeldata            : out std_logic_vector(15 downto 0) := (others => '0');
+      pixeldata            : buffer std_logic_vector(15 downto 0) := (others => '0');
       pixel_x              : out integer range 0 to 239;
       
       PALETTE_Drawer_addr  : out integer range 0 to 127;
@@ -80,6 +84,8 @@ architecture arch of gba_drawer_mode2 is
    
    signal colordata        : std_logic_vector(7 downto 0) := (others => '0');
    
+   signal mosaik_cnt       : integer range 0 to 15 := 0;
+   
 begin 
 
    mapbaseaddr  <= to_integer(mapbase) * 2048;
@@ -112,8 +118,13 @@ begin
                      when others => null;
                   end case;
                   x_cnt     <= 0;
-                  realX     <= refX;
-                  realY     <= refY;
+                  if (mosaic = '1') then
+                     realX     <= refX_mosaic;
+                     realY     <= refY_mosaic;
+                  else
+                     realX     <= refX;
+                     realY     <= refY;
+                  end if;
                elsif (palettefetch = IDLE) then
                   busy         <= '0';
                end if;
@@ -212,18 +223,33 @@ begin
       
          vram_data_ack <= '0';
          pixel_we      <= '0';
+         
+         if (drawline = '1') then
+            mosaik_cnt    <= 15; -- first pixel must fetch new data
+            pixeldata(15) <= '1';
+         end if;
       
          case (palettefetch) is
          
             when IDLE =>
                if (vramfetch = FETCHDONE and vram_data_ack = '0') then
+               
                   vram_data_ack    <= '1';
-                  palettefetch     <= STARTREAD; 
                   pixel_x          <= x_cnt;
-                  
-                  PALETTE_byteaddr <= colordata & '0';
-                  if (colordata = x"00") then -- transparent
-                     palettefetch <= IDLE;
+               
+                  if (mosaik_cnt < Mosaic_H_Size and mosaic = '1') then
+                     mosaik_cnt <= mosaik_cnt + 1;
+                     pixel_we   <= not pixeldata(15);
+                     
+                  else
+                     mosaik_cnt       <= 0;
+                     
+                     palettefetch     <= STARTREAD; 
+                     PALETTE_byteaddr <= colordata & '0';
+                     if (colordata = x"00") then -- transparent
+                        palettefetch  <= IDLE;
+                        pixeldata(15) <= '1';
+                     end if;
                   end if;
                end if;
                

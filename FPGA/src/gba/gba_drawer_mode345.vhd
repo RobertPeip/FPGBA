@@ -12,13 +12,17 @@ entity gba_drawer_mode345 is
       busy                 : out std_logic := '0';
       
       second_frame         : in  std_logic;
+      mosaic               : in  std_logic;
+      Mosaic_H_Size        : in  unsigned(3 downto 0);
       refX                 : in  signed(27 downto 0);
       refY                 : in  signed(27 downto 0);
+      refX_mosaic          : in  signed(27 downto 0);
+      refY_mosaic          : in  signed(27 downto 0);
       dx                   : in  signed(15 downto 0);
       dy                   : in  signed(15 downto 0);
       
       pixel_we             : out std_logic := '0';
-      pixeldata            : out std_logic_vector(15 downto 0) := (others => '0');
+      pixeldata            : buffer std_logic_vector(15 downto 0) := (others => '0');
       pixel_x              : out integer range 0 to 239;
 
       PALETTE_Drawer_addr  : out integer range 0 to 127;
@@ -64,13 +68,14 @@ architecture arch of gba_drawer_mode345 is
    signal vram_readwait    : integer range 0 to 2;
    signal vram_data        : std_logic_vector(15 downto 0);
    signal vram_data_ack    : std_logic := '0';
-   signal x_cnt_save       : integer range 0 to 239;
    
    signal PALETTE_byteaddr : unsigned(8 downto 0); 
    signal palette_readwait : integer range 0 to 2;
    signal palette_data     : std_logic_vector(15 downto 0);
    signal palette_data_req : std_logic := '0';
    signal palette_data_ack : std_logic := '0';
+   
+   signal mosaik_cnt       : integer range 0 to 15 := 0;
    
 begin 
 
@@ -94,8 +99,13 @@ begin
                if (drawline = '1') then
                   busy      <= '1';
                   vramfetch <= STARTREAD;
-                  realX     <= refX;
-                  realY     <= refY;
+                  if (mosaic = '1') then
+                     realX     <= refX_mosaic;
+                     realY     <= refY_mosaic;
+                  else
+                     realX     <= refX;
+                     realY     <= refY;
+                  end if;
                   x_cnt     <= 0;
                elsif (DrawState = NEXTPIXEL and palettefetch = IDLE) then
                   busy      <= '0';
@@ -214,25 +224,39 @@ begin
          palette_data_ack <= '0';
          
          pixel_we <= '0';
+         
+         if (drawline = '1') then
+            mosaik_cnt    <= 15; -- first pixel must fetch new data
+            pixeldata(15) <= '1';
+         end if;
       
          case (DrawState) is
          
             when NEXTPIXEL =>
                if (vramfetch = FETCHDONE and vram_data_ack = '0') then
+               
                   vram_data_ack <= '1';
-                  x_cnt_save    <= x_cnt;
-                  if (BG_Mode = "100") then
-                     palette_data_req <= '1';
-                     DrawState        <= READPALETTE; 
-                     if (VRAM_byteaddr(0) = '1') then
-                        PALETTE_byteaddr <= unsigned(vram_data(15 downto 8)) & '0';
-                     else
-                        PALETTE_byteaddr <= unsigned(vram_data(7 downto 0)) & '0';
-                     end if;
+                  pixel_x       <= x_cnt;
+               
+                  if (mosaik_cnt < Mosaic_H_Size and mosaic = '1') then
+                     mosaik_cnt <= mosaik_cnt + 1;
+                     pixel_we   <= not pixeldata(15);
                   else
-                     pixel_we      <= '1';
-                     pixeldata     <= '0' & vram_data(14 downto 0);
-                     pixel_x       <= x_cnt;
+                     mosaik_cnt <= 0;
+                     
+                     if (BG_Mode = "100") then
+                        palette_data_req <= '1';
+                        DrawState        <= READPALETTE; 
+                        if (VRAM_byteaddr(0) = '1') then
+                           PALETTE_byteaddr <= unsigned(vram_data(15 downto 8)) & '0';
+                        else
+                           PALETTE_byteaddr <= unsigned(vram_data(7 downto 0)) & '0';
+                        end if;
+                     else
+                        pixel_we   <= '1';
+                        
+                        pixeldata  <= '0' & vram_data(14 downto 0);
+                     end if;
                   end if;
                end if;
                
@@ -242,7 +266,6 @@ begin
                   DrawState        <= NEXTPIXEL;
                   pixel_we         <= '1';
                   pixeldata        <= '0' & palette_data(14 downto 0);
-                  pixel_x          <= x_cnt_save;
                end if;
 
          end case;
