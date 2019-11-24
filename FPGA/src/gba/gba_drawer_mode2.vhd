@@ -142,7 +142,7 @@ begin
                else
                   xxx <= xxx_pre; 
                   yyy <= yyy_pre;
-                  if (xxx_pre < 0 or xxx_pre < 0 or xxx_pre >= scroll_mod or xxx_pre >= scroll_mod) then
+                  if (xxx_pre < 0 or yyy_pre < 0 or xxx_pre >= scroll_mod or yyy_pre >= scroll_mod) then
                      if (x_cnt < 239) then
                         vramfetch <= CALCADDR1;
                         x_cnt     <= x_cnt + 1;
