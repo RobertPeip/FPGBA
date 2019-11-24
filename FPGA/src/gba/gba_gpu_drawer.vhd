@@ -337,8 +337,6 @@ architecture arch of gba_gpu_drawer is
                                  
    -- merge_pixel                
    signal pixeldata_back         : std_logic_vector(15 downto 0) := (others => '0');
-   signal allow_start            : std_logic := '1';
-   signal merge_line             : std_logic := '0';
    signal merge_enable           : std_logic := '0';
    signal merge_enable_1         : std_logic := '0';
    signal merge_pixeldata_out    : std_logic_vector(15 downto 0);
@@ -354,7 +352,16 @@ architecture arch of gba_gpu_drawer is
    signal lineUpToDate           : std_logic_vector(0 to 159) := (others => '0');
    signal linesDrawn             : integer range 0 to 160 := 0;
    signal nextLineDrawn          : std_logic := '0';
-   signal nextLineCounter        : integer range 0 to 159 := 0;
+   signal start_draw             : std_logic := '0';
+   
+   type tdrawstate is
+   (
+      IDLE,
+      WAITDRAW,
+      DRAWING,
+      MERGING
+   );
+   signal drawstate : tdrawstate := IDLE;
    
    -- affine + mosaik
    signal ref2_x : signed(27 downto 0) := (others => '0'); 
@@ -903,16 +910,14 @@ begin
       VRAM_Drawer_valid    => VRAM_Drawer_valid_Hi(1)
    );
    
-   
-   -- todo: for backgrounds: if (!mosaic_on || mosaik_bg0_vcnt == 0)
-   drawline_mode0_0 <= Screen_Display_BG0(Screen_Display_BG0'left) and drawline_1 and allow_start and (not nextLineDrawn) when BG_Mode = "000" or BG_Mode = "001" else '0';
-   drawline_mode0_1 <= Screen_Display_BG1(Screen_Display_BG1'left) and drawline_1 and allow_start and (not nextLineDrawn) when BG_Mode = "000" or BG_Mode = "001" else '0';
-   drawline_mode0_2 <= Screen_Display_BG2(Screen_Display_BG2'left) and drawline_1 and allow_start and (not nextLineDrawn) when BG_Mode = "000" else '0';
-   drawline_mode0_3 <= Screen_Display_BG3(Screen_Display_BG3'left) and drawline_1 and allow_start and (not nextLineDrawn) when BG_Mode = "000" else '0';
-   drawline_mode2_2 <= Screen_Display_BG2(Screen_Display_BG2'left) and drawline_1 and allow_start and (not nextLineDrawn) when BG_Mode = "001" or BG_Mode = "010" else '0';
-   drawline_mode2_3 <= Screen_Display_BG3(Screen_Display_BG3'left) and drawline_1 and allow_start and (not nextLineDrawn) when BG_Mode = "010" else '0';
-   drawline_mode345 <= Screen_Display_BG2(Screen_Display_BG2'left) and drawline_1 and allow_start and (not nextLineDrawn) when BG_Mode = "011" or BG_Mode = "100" or BG_Mode = "101" else '0';
-   drawline_obj     <= Screen_Display_OBJ(Screen_Display_OBJ'left) and drawline_1 and allow_start and (not nextLineDrawn);
+   drawline_mode0_0 <= Screen_Display_BG0(Screen_Display_BG0'left) and start_draw when BG_Mode = "000" or BG_Mode = "001" else '0';
+   drawline_mode0_1 <= Screen_Display_BG1(Screen_Display_BG1'left) and start_draw when BG_Mode = "000" or BG_Mode = "001" else '0';
+   drawline_mode0_2 <= Screen_Display_BG2(Screen_Display_BG2'left) and start_draw when BG_Mode = "000" else '0';
+   drawline_mode0_3 <= Screen_Display_BG3(Screen_Display_BG3'left) and start_draw when BG_Mode = "000" else '0';
+   drawline_mode2_2 <= Screen_Display_BG2(Screen_Display_BG2'left) and start_draw when BG_Mode = "001" or BG_Mode = "010" else '0';
+   drawline_mode2_3 <= Screen_Display_BG3(Screen_Display_BG3'left) and start_draw when BG_Mode = "010" else '0';
+   drawline_mode345 <= Screen_Display_BG2(Screen_Display_BG2'left) and start_draw when BG_Mode = "011" or BG_Mode = "100" or BG_Mode = "101" else '0';
+   drawline_obj     <= Screen_Display_OBJ(Screen_Display_OBJ'left) and start_draw;
 
    PALETTE_BG_Drawer_addr0 <= PALETTE_Drawer_addr_mode0_0;
    PALETTE_BG_Drawer_addr1 <= PALETTE_Drawer_addr_mode0_1;
@@ -1172,56 +1177,63 @@ begin
             linebuffer_objwindow(pixel_x_obj) <= '1';
          end if;
          
-         nextLineDrawn <= lineUpToDate(nextLineCounter);
-
+         -- synthesis translate_off
+         if (to_integer(linecounter) < 160) then
+         -- synthesis translate_on
+         nextLineDrawn <= lineUpToDate(to_integer(linecounter));
+         -- synthesis translate_off
+         end if;
+         -- synthesis translate_on
+         
          drawline_1 <= drawline;
-
+         start_draw <= '0';
+         
          if (vblank_trigger = '1') then
             if (linesDrawn = 160) then
                lineUpToDate <= (others => '0');
-            else
             end if;
-            nextLineCounter <= 0;
             linesDrawn      <= 0;
-         elsif (drawline_1 = '1' and nextLineCounter < 159) then
-            nextLineCounter <= nextLineCounter + 1;
          end if;  
-
-         if (drawline_1 = '1' and nextLineDrawn = '1') then
-            linesDrawn <= linesDrawn + 1;
-         end if;
          
-         if (drawline_1 = '1' and busy_allmod = x"00" and allow_start = '1' and nextLineDrawn = '0') then
-            linebuffer_addr      <= 0;
-            merge_enable         <= '0';
-            linebuffer_objwindow <= (others => '0');
-            allow_start          <= '0';
-            linesDrawn           <= linesDrawn + 1;
-            lineUpToDate(nextLineCounter) <= '1';
-            merge_line <= '0';
-            if (draw_allmod /= x"00") then
-               merge_line <= '1';
-            else
-               allow_start <= '1';
-            end if;
-         end if;
-            
          clear_trigger <= '0';
-         if (merge_line = '1' and busy_allmod = x"00") then 
-            linebuffer_addr  <= 0;
-            merge_enable     <= '1';
-            merge_line       <= '0';
-            clear_trigger    <= '1';
-         end if;
-         
-         if (merge_enable = '1') then
-            if (linebuffer_addr < 239) then
-               linebuffer_addr <= linebuffer_addr + 1;
-            else
-               merge_enable     <= '0';
-               allow_start      <= '1';
-            end if;
-         end if;
+
+         case (drawstate) is
+            when IDLE =>
+               if (drawline_1 = '1') then
+                  linesDrawn <= linesDrawn + 1;
+                  if (nextLineDrawn = '0') then
+                     drawstate       <= WAITDRAW;
+                     start_draw      <= '1';
+                     linecounter_int <= to_integer(linecounter);
+                     lineUpToDate(to_integer(linecounter)) <= '1';
+                     linebuffer_objwindow <= (others => '0');
+                  end if;
+               end if;
+               
+            when WAITDRAW =>
+               if (draw_allmod /= x"00") then
+                  drawstate <= DRAWING;
+               else
+                  drawstate <= IDLE;
+               end if;
+
+            when DRAWING =>
+               if (busy_allmod = x"00") then
+                  drawstate     <= MERGING;
+                  linebuffer_addr  <= 0;
+                  merge_enable     <= '1';
+                  clear_trigger    <= '1';
+               end if;
+            
+            when MERGING =>
+               if (linebuffer_addr < 239) then
+                  linebuffer_addr <= linebuffer_addr + 1;
+               else
+                  merge_enable    <= '0';
+                  drawstate       <= IDLE;
+               end if;
+            
+         end case; 
       
          linebuffer_addr_1 <= linebuffer_addr;
          merge_enable_1 <= merge_enable;
@@ -1342,8 +1354,7 @@ begin
             linecounter_mosaic_bg  <= 0;
             linecounter_mosaic_obj <= 0;
          elsif (drawline = '1') then
-            linecounter_int <= to_integer(linecounter);
-            
+         
             -- background
             if (mosaik_vcnt_bg < unsigned(REG_MOSAIC_BG_Mosaic_V_Size)) then
                mosaik_vcnt_bg <= mosaik_vcnt_bg + 1;
