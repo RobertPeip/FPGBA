@@ -16,6 +16,7 @@ entity gba_sound_dma is
    port 
    (
       clk100              : in    std_logic;  
+      gb_on               : in    std_logic;  
       gb_bus              : inout proc_bus_gb_type := ((others => 'Z'), (others => 'Z'), (others => 'Z'), 'Z', 'Z', 'Z', "ZZ", "ZZZZ", 'Z');
       
       settings_new        : in    std_logic;
@@ -106,67 +107,75 @@ begin
          fifo_Wr    <= '0';
          fifo_Rd    <= '0';
          
-         fifo_valid <= fifo_Rd;
-         if (fifo_valid = '1') then
-            if (volume_high = '1') then
-               sound_out <= resize(signed(fifo_Dout) * 4, sound_out'length);
-            else
-               sound_out <= resize(signed(fifo_Dout) * 2, sound_out'length);
-            end if;
-         end if;
+         if (gb_on = '0') then
          
-         FIFO_WRITE_ENABLES <= gb_bus.bEna;
+            sound_out <= (others => '0');
          
-         if (settings_new = '1' and Reset_FIFO = '1') then
-            fifo_reset <= '1';
-            fifo_cnt   <= 0;
-         end if;
+         else
          
-         -- keep new request if fifo is not idling to make sure the sample counter works correct
-         if (any_on = '1' and ((timer0_tick = '1' and Timer_Select = '0') or (timer1_tick = '1' and Timer_Select = '1'))) then 
-            new_sample_request <= '1';
-         end if;
-         
-         if (FIFO_REGISTER_written = '1') then
-         
-            if (FIFO_WRITE_ENABLES(2) = '1') then -- 32bit write
-               fillbytes  <= 4;
-               write_data <= FIFO_REGISTER;
-            else -- 16bit write
-               fillbytes <= 2;
-               write_data(31 downto 16) <= FIFO_REGISTER(15 downto 0);
-            end if;
-            
-         elsif (fillbytes > 0) then -- fill fifo
-         
-            fillbytes <= fillbytes - 1;
-            if (fifo_Full = '0' and fifo_cnt < 63) then
-               fifo_cnt <= fifo_cnt + 1;
-               fifo_Wr  <= '1';
-               case (fillbytes) is
-                  when 4 => fifo_Din <= write_data( 7 downto 0);
-                  when 3 => fifo_Din <= write_data(15 downto 8);
-                  when 2 => fifo_Din <= write_data(23 downto 16);
-                  when 1 => fifo_Din <= write_data(31 downto 24);
-                  when others => null;
-               end case;
-            end if;
-            
-         elsif (new_sample_request = '1') then -- get sample from fifo
-         
-            new_sample_request <= '0'; 
-            if (fifo_cnt > 0) then 
-               fifo_cnt <= fifo_cnt - 1;
-               if (fifo_Empty = '0') then
-                  fifo_Rd  <= '1';
+            fifo_valid <= fifo_Rd;
+            if (fifo_valid = '1') then
+               if (volume_high = '1') then
+                  sound_out <= resize(signed(fifo_Dout) * 4, sound_out'length);
+               else
+                  sound_out <= resize(signed(fifo_Dout) * 2, sound_out'length);
                end if;
             end if;
             
-            if ((fifo_cnt = 0) or ((fifo_cnt - 1) = 0) or ((fifo_cnt - 1) = 16)) then 
-               dma_req <= '1';
-            end if; 
+            FIFO_WRITE_ENABLES <= gb_bus.bEna;
             
-         end if;  
+            if (settings_new = '1' and Reset_FIFO = '1') then
+               fifo_reset <= '1';
+               fifo_cnt   <= 0;
+            end if;
+            
+            -- keep new request if fifo is not idling to make sure the sample counter works correct
+            if (any_on = '1' and ((timer0_tick = '1' and Timer_Select = '0') or (timer1_tick = '1' and Timer_Select = '1'))) then 
+               new_sample_request <= '1';
+            end if;
+            
+            if (FIFO_REGISTER_written = '1') then
+            
+               if (FIFO_WRITE_ENABLES(2) = '1') then -- 32bit write
+                  fillbytes  <= 4;
+                  write_data <= FIFO_REGISTER;
+               else -- 16bit write
+                  fillbytes <= 2;
+                  write_data(31 downto 16) <= FIFO_REGISTER(15 downto 0);
+               end if;
+               
+            elsif (fillbytes > 0) then -- fill fifo
+            
+               fillbytes <= fillbytes - 1;
+               if (fifo_Full = '0' and fifo_cnt < 63) then
+                  fifo_cnt <= fifo_cnt + 1;
+                  fifo_Wr  <= '1';
+                  case (fillbytes) is
+                     when 4 => fifo_Din <= write_data( 7 downto 0);
+                     when 3 => fifo_Din <= write_data(15 downto 8);
+                     when 2 => fifo_Din <= write_data(23 downto 16);
+                     when 1 => fifo_Din <= write_data(31 downto 24);
+                     when others => null;
+                  end case;
+               end if;
+               
+            elsif (new_sample_request = '1') then -- get sample from fifo
+            
+               new_sample_request <= '0'; 
+               if (fifo_cnt > 0) then 
+                  fifo_cnt <= fifo_cnt - 1;
+                  if (fifo_Empty = '0') then
+                     fifo_Rd  <= '1';
+                  end if;
+               end if;
+               
+               if ((fifo_cnt = 0) or ((fifo_cnt - 1) = 0) or ((fifo_cnt - 1) = 16)) then 
+                  dma_req <= '1';
+               end if; 
+               
+            end if;  
+            
+         end if;
       
       end if;
    end process;

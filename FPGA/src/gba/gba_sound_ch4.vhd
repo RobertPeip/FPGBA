@@ -10,6 +10,7 @@ entity gba_sound_ch4 is
    port 
    (
       clk100              : in    std_logic;  
+      gb_on               : in    std_logic;  
       gb_bus              : inout proc_bus_gb_type := ((others => 'Z'), (others => 'Z'), (others => 'Z'), 'Z', 'Z', 'Z', "ZZ", "ZZZZ", 'Z');
       
       new_cycles          : in    unsigned(7 downto 0);
@@ -39,21 +40,21 @@ architecture arch of gba_sound_ch4 is
    signal Dividing_Ratio_of_Freq_written     : std_logic;                                                                                                                                                                                                                                                                                                         
    signal Initial_written                    : std_logic;                                                                                                                                                      
           
-   signal length_left   : unsigned(6 downto 0) := (others => '0');
-                        
-   signal envelope_cnt  : unsigned(5 downto 0) := (others => '0');
-   signal envelope_add  : unsigned(5 downto 0) := (others => '0');
-                        
-   signal volume        : integer range 0 to 15 := 0;
-   signal wave_on       : std_logic := '0';      
-                        
-   signal divider_raw   : unsigned(23 downto 0) := (others => '0');
-   signal freq_divider  : unsigned(23 downto 0) := (others => '0');
-   signal length_on     : std_logic := '0';
-   signal ch_on         : std_logic := '0';
-   
-   signal lfsr7bit      : std_logic := '0';
-   signal lfsr          : std_logic_vector(14 downto 0) := (others => '0');
+   signal length_left          : unsigned(6 downto 0) := (others => '0');
+                               
+   signal envelope_cnt         : unsigned(5 downto 0) := (others => '0');
+   signal envelope_add         : unsigned(5 downto 0) := (others => '0');
+                               
+   signal volume               : integer range 0 to 15 := 0;
+   signal wave_on              : std_logic := '0';      
+                               
+   signal divider_raw          : unsigned(23 downto 0) := (others => '0');
+   signal freq_divider         : unsigned(23 downto 0) := (others => '0');
+   signal length_on            : std_logic := '0';
+   signal ch_on                : std_logic := '0';
+          
+   signal lfsr7bit             : std_logic := '0';
+   signal lfsr                 : std_logic_vector(14 downto 0) := (others => '0');
    
    signal soundcycles_freq     : unsigned(23 downto 0)  := (others => '0');
    signal soundcycles_envelope : unsigned(17 downto 0) := (others => '0');
@@ -79,123 +80,147 @@ begin
    begin
       if rising_edge(clk100) then
       
-         -- register write triggers
-         if (Sound_length_written = '1') then
-            length_left <= to_unsigned(64, 7) - unsigned(REG_Sound_length);
-         end if;
+         if (gb_on = '0') then
          
-         if (Initial_Volume_of_envelope_written = '1') then
-            envelope_cnt <= (others => '0');
-            envelope_add <= (others => '0');
-            volume       <= to_integer(unsigned(REG_Initial_Volume_of_envelope));
-         end if;
-         
-         if (Dividing_Ratio_of_Freq_written = '1') then
-            case to_integer(unsigned(REG_Dividing_Ratio_of_Freq)) is
-               when 0 => divider_raw <= to_unsigned(  8, divider_raw'length);
-               when 1 => divider_raw <= to_unsigned( 16, divider_raw'length);
-               when 2 => divider_raw <= to_unsigned( 32, divider_raw'length);
-               when 3 => divider_raw <= to_unsigned( 48, divider_raw'length);
-               when 4 => divider_raw <= to_unsigned( 64, divider_raw'length);
-               when 5 => divider_raw <= to_unsigned( 80, divider_raw'length);
-               when 6 => divider_raw <= to_unsigned( 96, divider_raw'length);
-               when 7 => divider_raw <= to_unsigned(112, divider_raw'length);
-               when others => null;
-            end case;
+            sound_out <= (others => '0');
+            sound_on  <= '0';
             
-            lfsr7bit <= REG_Counter_Step_Width(REG_Counter_Step_Width'left);
-            
-         end if;
-         freq_divider <= divider_raw sll to_integer(unsigned(REG_Shift_Clock_Frequency));
+            length_left          <= (others => '0');
+            envelope_cnt         <= (others => '0');
+            envelope_add         <= (others => '0');
+            volume               <= 0;
+            wave_on              <= '0';      
+            divider_raw          <= (others => '0');
+            freq_divider         <= (others => '0');
+            length_on            <= '0';
+            ch_on                <= '0';
+            lfsr7bit             <= '0';
+            lfsr                 <= (others => '0');
+            soundcycles_freq     <= (others => '0');
+            soundcycles_envelope <= (others => '0');
+            soundcycles_length   <= (others => '0');
          
-         if (Initial_written = '1') then
-            length_on <= REG_Length_Flag(REG_Length_Flag'left);
-            if (REG_Initial = "1") then
+         else
+      
+            -- register write triggers
+            if (Sound_length_written = '1') then
+               length_left <= to_unsigned(64, 7) - unsigned(REG_Sound_length);
+            end if;
+            
+            if (Initial_Volume_of_envelope_written = '1') then
                envelope_cnt <= (others => '0');
                envelope_add <= (others => '0');
-               ch_on        <= '1';
+               volume       <= to_integer(unsigned(REG_Initial_Volume_of_envelope));
+            end if;
+            
+            if (Dividing_Ratio_of_Freq_written = '1') then
+               case to_integer(unsigned(REG_Dividing_Ratio_of_Freq)) is
+                  when 0 => divider_raw <= to_unsigned(  8, divider_raw'length);
+                  when 1 => divider_raw <= to_unsigned( 16, divider_raw'length);
+                  when 2 => divider_raw <= to_unsigned( 32, divider_raw'length);
+                  when 3 => divider_raw <= to_unsigned( 48, divider_raw'length);
+                  when 4 => divider_raw <= to_unsigned( 64, divider_raw'length);
+                  when 5 => divider_raw <= to_unsigned( 80, divider_raw'length);
+                  when 6 => divider_raw <= to_unsigned( 96, divider_raw'length);
+                  when 7 => divider_raw <= to_unsigned(112, divider_raw'length);
+                  when others => null;
+               end case;
                
-               lfsr <= (others => '0');
-               if (REG_Counter_Step_Width = "1") then
-                  lfsr(6) <= '1';
-               else
-                  lfsr(14) <= '1';
-               end if;
+               lfsr7bit <= REG_Counter_Step_Width(REG_Counter_Step_Width'left);
+               
             end if;
-         end if;
-         
-         -- cpu cycle trigger
-         if (new_cycles_valid = '1') then
-            soundcycles_freq     <= soundcycles_freq     + new_cycles;
-            soundcycles_envelope <= soundcycles_envelope + new_cycles;
-            soundcycles_length   <= soundcycles_length   + new_cycles;
-         end if;
-         
-         -- freq / wavetable
-         if (soundcycles_freq >= freq_divider) then
-            soundcycles_freq <= soundcycles_freq - freq_divider;
-            wave_on <= not lfsr(0);
-            if (lfsr7bit = '1') then
-               lfsr <= x"00" & (lfsr(1) xor lfsr(0)) & lfsr(6 downto 1);
-            else
-               lfsr <= (lfsr(1) xor lfsr(0)) & lfsr(14 downto 1);
-            end if;
-         end if;
-         
-         -- envelope
-         if (soundcycles_envelope >= 65536) then -- 64 Hz
-            soundcycles_envelope <= soundcycles_envelope - 65536;
-            if (REG_Envelope_Step_Time /= "000") then
-               envelope_cnt <= envelope_cnt + 1;
-            end if;
-         end if;
-         
-         if (REG_Envelope_Step_Time /= "000") then
-            if (envelope_cnt >= unsigned(REG_Envelope_Step_Time)) then
-               envelope_cnt <= (others => '0');
-               if (envelope_add < 15) then
-                  envelope_add <= envelope_add + 1;
+            freq_divider <= divider_raw sll to_integer(unsigned(REG_Shift_Clock_Frequency));
+            
+            if (Initial_written = '1') then
+               length_on <= REG_Length_Flag(REG_Length_Flag'left);
+               if (REG_Initial = "1") then
+                  envelope_cnt <= (others => '0');
+                  envelope_add <= (others => '0');
+                  ch_on        <= '1';
+                  
+                  lfsr <= (others => '0');
+                  if (REG_Counter_Step_Width = "1") then
+                     lfsr(6) <= '1';
+                  else
+                     lfsr(14) <= '1';
+                  end if;
                end if;
             end if;
             
-            if (REG_Envelope_Direction = "0") then -- decrease
-               if (unsigned(REG_Initial_Volume_of_envelope) >= envelope_add) then
-                  volume <= to_integer(unsigned(REG_Initial_Volume_of_envelope)) - to_integer(envelope_add);
+            -- cpu cycle trigger
+            if (new_cycles_valid = '1') then
+               soundcycles_freq     <= soundcycles_freq     + new_cycles;
+               soundcycles_envelope <= soundcycles_envelope + new_cycles;
+               soundcycles_length   <= soundcycles_length   + new_cycles;
+            end if;
+            
+            -- freq / wavetable
+            if (soundcycles_freq >= freq_divider) then
+               soundcycles_freq <= soundcycles_freq - freq_divider;
+               wave_on <= not lfsr(0);
+               if (lfsr7bit = '1') then
+                  lfsr <= x"00" & (lfsr(1) xor lfsr(0)) & lfsr(6 downto 1);
                else
-                  volume <= 0;
+                  lfsr <= (lfsr(1) xor lfsr(0)) & lfsr(14 downto 1);
+               end if;
+            end if;
+            
+            -- envelope
+            if (soundcycles_envelope >= 65536) then -- 64 Hz
+               soundcycles_envelope <= soundcycles_envelope - 65536;
+               if (REG_Envelope_Step_Time /= "000") then
+                  envelope_cnt <= envelope_cnt + 1;
+               end if;
+            end if;
+            
+            if (REG_Envelope_Step_Time /= "000") then
+               if (envelope_cnt >= unsigned(REG_Envelope_Step_Time)) then
+                  envelope_cnt <= (others => '0');
+                  if (envelope_add < 15) then
+                     envelope_add <= envelope_add + 1;
+                  end if;
+               end if;
+               
+               if (REG_Envelope_Direction = "0") then -- decrease
+                  if (unsigned(REG_Initial_Volume_of_envelope) >= envelope_add) then
+                     volume <= to_integer(unsigned(REG_Initial_Volume_of_envelope)) - to_integer(envelope_add);
+                  else
+                     volume <= 0;
+                  end if;
+               else
+                  if (unsigned(REG_Initial_Volume_of_envelope) + envelope_add <= 15) then
+                     volume <= to_integer(unsigned(REG_Initial_Volume_of_envelope)) + to_integer(envelope_add);
+                  else
+                     volume <= 15;
+                  end if;
+               end if;
+            end if;
+         
+            -- length
+            if (soundcycles_length >= 16384) then -- 256 Hz
+               soundcycles_length <= soundcycles_length - 16384;
+               if (length_left > 0 and length_on = '1') then
+                  length_left <= length_left - 1;
+                  if (length_left = 1) then
+                     ch_on <= '0';
+                  end if;
+               end if;
+            end if;
+         
+            -- sound out
+            if (ch_on = '1') then
+               if (wave_on = '1') then
+                  sound_out <= to_signed(1 * volume, 16);
+               else
+                  sound_out <= to_signed(-1 * volume, 16);
                end if;
             else
-               if (unsigned(REG_Initial_Volume_of_envelope) + envelope_add <= 15) then
-                  volume <= to_integer(unsigned(REG_Initial_Volume_of_envelope)) + to_integer(envelope_add);
-               else
-                  volume <= 15;
-               end if;
+               sound_out <= (others => '0');
             end if;
+         
+            sound_on <= ch_on;
+            
          end if;
-      
-         -- length
-         if (soundcycles_length >= 16384) then -- 256 Hz
-            soundcycles_length <= soundcycles_length - 16384;
-            if (length_left > 0 and length_on = '1') then
-               length_left <= length_left - 1;
-               if (length_left = 1) then
-                  ch_on <= '0';
-               end if;
-            end if;
-         end if;
-        
-         -- sound out
-         if (ch_on = '1') then
-            if (wave_on = '1') then
-               sound_out <= to_signed(1 * volume, 16);
-            else
-               sound_out <= to_signed(-1 * volume, 16);
-            end if;
-         else
-            sound_out <= (others => '0');
-         end if;
-      
-         sound_on <= ch_on;
       
       end if;
    end process;

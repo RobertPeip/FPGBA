@@ -8,8 +8,13 @@ use work.pReg_gba_sound.all;
 entity gba_sound is
    port 
    (
-      clk100              : in    std_logic;  
+      clk100              : in    std_logic; 
+      gb_on               : in    std_logic;      
       gb_bus              : inout proc_bus_gb_type := ((others => 'Z'), (others => 'Z'), (others => 'Z'), 'Z', 'Z', 'Z', "ZZ", "ZZZZ", 'Z');
+      
+      lockspeed           : in    std_logic;
+      bus_cycles          : in    unsigned(7 downto 0);
+      bus_cycles_valid    : in    std_logic;
       
       timer0_tick         : in    std_logic;
       timer1_tick         : in    std_logic;
@@ -60,6 +65,7 @@ architecture arch of gba_sound is
    signal new_cycles          : unsigned(7 downto 0) := (others => '0');
    signal new_cycles_slow     : unsigned(7 downto 0) := (others => '0');
    signal new_cycles_valid    : std_logic := '0';
+   signal bus_cycles_sum      : unsigned(7 downto 0) := (others => '0');
 
    signal sound_out_ch1  : signed(15 downto 0);
    signal sound_out_ch2  : signed(15 downto 0);
@@ -163,7 +169,8 @@ begin
    )
    port map
    (
-      clk100           => clk100,          
+      clk100           => clk100, 
+      gb_on            => gb_on,      
       gb_bus           => gb_bus,          
       new_cycles       => new_cycles,      
       new_cycles_valid => new_cycles_valid,
@@ -190,7 +197,8 @@ begin
    )
    port map
    (
-      clk100           => clk100,          
+      clk100           => clk100, 
+      gb_on            => gb_on,        
       gb_bus           => gb_bus,          
       new_cycles       => new_cycles,      
       new_cycles_valid => new_cycles_valid,
@@ -201,7 +209,8 @@ begin
    igba_sound_ch3 : entity work.gba_sound_ch3
    port map
    (
-      clk100           => clk100,          
+      clk100           => clk100,     
+      gb_on            => gb_on,        
       gb_bus           => gb_bus,          
       new_cycles       => new_cycles,      
       new_cycles_valid => new_cycles_valid,
@@ -212,7 +221,8 @@ begin
    igba_sound_ch4 : entity work.gba_sound_ch4
    port map
    (
-      clk100           => clk100,          
+      clk100           => clk100,  
+      gb_on            => gb_on,        
       gb_bus           => gb_bus,          
       new_cycles       => new_cycles,      
       new_cycles_valid => new_cycles_valid,
@@ -228,6 +238,7 @@ begin
    port map
    (
       clk100              => clk100,
+      gb_on               => gb_on,  
       gb_bus              => gb_bus,
                            
       settings_new        => SOUNDCNT_H_DMA_written,
@@ -256,6 +267,7 @@ begin
    port map
    (
       clk100              => clk100,
+      gb_on               => gb_on,  
       gb_bus              => gb_bus,
                            
       settings_new        => SOUNDCNT_H_DMA_written,
@@ -276,22 +288,30 @@ begin
       debug_fifocount     => open
    );
    
-   new_cycles <= x"04";
-   
-   -- todo: stereo
-   -- todo : volume_left/right
    process (clk100)
    begin
       if rising_edge(clk100) then
-         
-         -- generate exact timing, cannot use gameboy time
+        
          new_cycles_valid <= '0';
                 
-         if (new_cycles_slow < 99) then
-            new_cycles_slow <= new_cycles_slow + 1;
+         -- run synchronized when with lockspeed, otherwise use fixed timing so sounds are not pitched up
+         -- channels 1-4 are from GB, they still work with 4 MHZ, so clock is divided by 4 here.
+         if (lockspeed = '1') then
+            new_cycles <= x"01";
+            if (bus_cycles_valid = '1') then
+               bus_cycles_sum <= bus_cycles_sum + bus_cycles;
+            elsif (bus_cycles_sum >= 4) then
+               new_cycles_valid <= '1';
+               bus_cycles_sum   <= bus_cycles_sum - 4;
+            end if;
          else
-            new_cycles_slow  <= (others => '0');
-            new_cycles_valid <= '1';
+            new_cycles <= x"04";
+            if (new_cycles_slow < 99) then
+               new_cycles_slow <= new_cycles_slow + 1;
+            else
+               new_cycles_slow  <= (others => '0');
+               new_cycles_valid <= '1';  
+            end if;
          end if;
          
          -- sound channel mixing

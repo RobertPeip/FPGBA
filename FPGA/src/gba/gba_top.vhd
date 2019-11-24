@@ -389,14 +389,19 @@ begin
    port map 
    ( 
       clk100               => clk100,
+      gb_on                => gbaon,
       gb_bus               => gb_bus,
+      
+      lockspeed            => GBA_lockspeed,
+      bus_cycles           => new_cycles,
+      bus_cycles_valid     => new_cycles_valid,
       
       timer0_tick          => timer0_tick,
       timer1_tick          => timer1_tick,
       sound_dma_req        => sound_dma_req,
       
-      sound_out_left     => sound_out_left,
-      sound_out_right    => sound_out_right,
+      sound_out_left       => sound_out_left,
+      sound_out_right      => sound_out_right,
       
       debug_fifocount      => debug_fifocount
    );

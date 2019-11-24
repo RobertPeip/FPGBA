@@ -9,7 +9,8 @@ use work.pReg_gba_sound.all;
 entity gba_sound_ch3 is
    port 
    (
-      clk100              : in    std_logic;  
+      clk100              : in    std_logic; 
+      gb_on               : in    std_logic;        
       gb_bus              : inout proc_bus_gb_type := ((others => 'Z'), (others => 'Z'), (others => 'Z'), 'Z', 'Z', 'Z', "ZZ", "ZZZZ", 'Z');
       
       new_cycles          : in    unsigned(7 downto 0);
@@ -53,28 +54,28 @@ architecture arch of gba_sound_ch3 is
    type t_waveram is array(0 to 1, 0 to 31) of std_logic_vector(3 downto 0);
    signal waveram : t_waveram := (others => (others => (others => '0')));
    
-   signal bank_access      : integer range 0 to 1;
-   signal bank_play        : integer range 0 to 1;
-   
-   signal choutput_on      : std_logic := '0';
+   signal bank_access         : integer range 0 to 1;
+   signal bank_play           : integer range 0 to 1 := 0;
+      
+   signal choutput_on         : std_logic := '0';
+                              
+   signal wavetable_ptr       : unsigned(4 downto 0)  := (others => '0');
+   signal wavetable           : std_logic_vector(0 to 7)  := (others => '0');
+   signal wave_vol            : std_logic_vector(3 downto 0) := (others => '0');         
+                              
+   signal length_left         : unsigned(8 downto 0) := (others => '0');   
                            
-   signal wavetable_ptr    : unsigned(4 downto 0)  := (others => '0');
-   signal wavetable        : std_logic_vector(0 to 7)  := (others => '0');
-   signal wave_vol         : std_logic_vector(3 downto 0) := (others => '0');         
+   signal volume_shift        : integer range 0 to 3  := 0;
+   signal wave_vol_shifted    : integer range 0 to 15 := 0;
                            
-   signal length_left      : unsigned(8 downto 0) := (others => '0');   
-                        
-   signal volume_shift     : integer range 0 to 3  := 0;
-   signal wave_vol_shifted : integer range 0 to 15 := 0;
-                        
-   signal freq_divider     : unsigned(11 downto 0) := (others => '0');
-   signal freq_check       : unsigned(11 downto 0) := (others => '0');
-   signal length_on        : std_logic := '0';
-   signal ch_on            : std_logic := '0';
-   signal freq_cnt         : unsigned(11 downto 0) := (others => '0');
+   signal freq_divider        : unsigned(11 downto 0) := (others => '0');
+   signal freq_check          : unsigned(11 downto 0) := (others => '0');
+   signal length_on           : std_logic := '0';
+   signal ch_on               : std_logic := '0';
+   signal freq_cnt            : unsigned(11 downto 0) := (others => '0');
    
-   signal soundcycles_freq     : unsigned(7 downto 0)  := (others => '0');
-   signal soundcycles_length   : unsigned(16 downto 0) := (others => '0');
+   signal soundcycles_freq    : unsigned(7 downto 0)  := (others => '0');
+   signal soundcycles_length  : unsigned(16 downto 0) := (others => '0');
    
 begin 
 
@@ -104,7 +105,7 @@ begin
    process (clk100)
    begin
       if rising_edge(clk100) then
-         
+      
          -- waveram
          if (waveram_written = '1') then 
             for i in 0 to 3 loop
@@ -134,88 +135,113 @@ begin
             end loop;
          end if;
          
-         -- other regs
-         if (SOUND3CNT_L_Sound_Channel_3_Off_written = '1') then
-            choutput_on <= REG_SOUND3CNT_L_Sound_Channel_3_Off(REG_SOUND3CNT_L_Sound_Channel_3_Off'left);
-         end if;
+         if (gb_on = '0') then
          
-         if (SOUND3CNT_H_Sound_length_written = '1') then
-            length_left <= to_unsigned(256, 9) - unsigned(REG_SOUND3CNT_H_Sound_length);
-         end if;
-         
-         if (SOUND3CNT_H_Sound_Volume_written = '1') then
-            volume_shift  <= to_integer(unsigned(REG_SOUND3CNT_H_Sound_Volume));
-         end if;
-         
-         if (SOUND3CNT_X_Sample_Rate_written = '1') then
-            freq_divider <= '0' & unsigned(REG_SOUND3CNT_X_Sample_Rate);
-            length_on <= REG_SOUND3CNT_X_Length_Flag(REG_SOUND3CNT_X_Length_Flag'left);
-            if (REG_SOUND3CNT_X_Initial = "1") then
-               ch_on        <= '1';
-               freq_cnt     <= (others => '0');
-            end if;
-         end if;
-         
-         -- cpu cycle trigger
-         if (new_cycles_valid = '1') then
-            soundcycles_freq     <= soundcycles_freq     + new_cycles;
-            soundcycles_length   <= soundcycles_length   + new_cycles;
-         end if;
-         
-         -- freq / wavetable
-         if (soundcycles_freq > 4) then
-            freq_cnt <= freq_cnt + soundcycles_freq / 2;
-            soundcycles_freq(soundcycles_freq'left downto 1) <= (others => '0');
-         end if;
-         
-         freq_check <= 2048 - freq_divider;
-         
-         if (freq_cnt >= freq_check) then
-            freq_cnt <= freq_cnt - freq_check;
-            wavetable_ptr <= wavetable_ptr + 1;
-            if (wavetable_ptr = 31 and REG_SOUND3CNT_L_Wave_RAM_Dimension = "1") then
-               bank_play <= 1 - bank_play;
-            end if;
-         end if;
-
-         -- length
-         if (soundcycles_length >= 16384) then -- 256 Hz
-            soundcycles_length <= soundcycles_length - 16384;
-            if (length_left > 0 and length_on = '1') then
-               length_left <= length_left - 1;
-               if (length_left = 1) then
-                  ch_on <= '0';
-               end if;
-            end if;
-         end if;
-         
-         -- setting bank from reg
-         if (SOUND3CNT_L_Wave_RAM_Bank_Number_written = '1') then
-            bank_play   <= to_integer(unsigned(REG_SOUND3CNT_L_Wave_RAM_Bank_Number));
-         end if;
-         
-         -- wavetable
-         wave_vol <= waveram(bank_play, to_integer(wavetable_ptr(4 downto 0)));
-         
-         if (REG_SOUND3CNT_H_Force_Volume = "1") then
-            wave_vol_shifted <= to_integer(unsigned(wave_vol)) * 3 / 4;
-         else
-            case volume_shift is
-               when 0 => wave_vol_shifted <= 0;
-               when 1 => wave_vol_shifted <= to_integer(unsigned(wave_vol));
-               when 2 => wave_vol_shifted <= to_integer(unsigned(wave_vol)) / 2;
-               when 3 => wave_vol_shifted <= to_integer(unsigned(wave_vol)) / 4;
-               when others => null;
-            end case;
-         end if;
-         
-         -- sound out
-         if (ch_on = '1') and (choutput_on = '1') then
-            sound_out <= to_signed(wave_vol_shifted, 16);
-            sound_on  <= '1';
-         else
             sound_out <= (others => '0');
             sound_on  <= '0';
+            
+            bank_play           <= 0;
+            choutput_on         <= '0';
+            wavetable_ptr       <= (others => '0');
+            wavetable           <= (others => '0');
+            wave_vol            <= (others => '0');         
+            length_left         <= (others => '0');   
+            volume_shift        <= 0;
+            wave_vol_shifted    <= 0;
+            freq_divider        <= (others => '0');
+            freq_check          <= (others => '0');
+            length_on           <= '0';         
+            ch_on               <= '0';         
+            freq_cnt            <= (others => '0');
+            soundcycles_freq    <= (others => '0');
+            soundcycles_length  <= (others => '0');
+         
+         else
+         
+            -- other regs
+            if (SOUND3CNT_L_Sound_Channel_3_Off_written = '1') then
+               choutput_on <= REG_SOUND3CNT_L_Sound_Channel_3_Off(REG_SOUND3CNT_L_Sound_Channel_3_Off'left);
+            end if;
+            
+            if (SOUND3CNT_H_Sound_length_written = '1') then
+               length_left <= to_unsigned(256, 9) - unsigned(REG_SOUND3CNT_H_Sound_length);
+            end if;
+            
+            if (SOUND3CNT_H_Sound_Volume_written = '1') then
+               volume_shift  <= to_integer(unsigned(REG_SOUND3CNT_H_Sound_Volume));
+            end if;
+            
+            if (SOUND3CNT_X_Sample_Rate_written = '1') then
+               freq_divider <= '0' & unsigned(REG_SOUND3CNT_X_Sample_Rate);
+               length_on <= REG_SOUND3CNT_X_Length_Flag(REG_SOUND3CNT_X_Length_Flag'left);
+               if (REG_SOUND3CNT_X_Initial = "1") then
+                  ch_on        <= '1';
+                  freq_cnt     <= (others => '0');
+               end if;
+            end if;
+            
+            -- cpu cycle trigger
+            if (new_cycles_valid = '1') then
+               soundcycles_freq     <= soundcycles_freq     + new_cycles;
+               soundcycles_length   <= soundcycles_length   + new_cycles;
+            end if;
+            
+            -- freq / wavetable
+            if (soundcycles_freq > 4) then
+               freq_cnt <= freq_cnt + soundcycles_freq / 2;
+               soundcycles_freq(soundcycles_freq'left downto 1) <= (others => '0');
+            end if;
+            
+            freq_check <= 2048 - freq_divider;
+            
+            if (freq_cnt >= freq_check) then
+               freq_cnt <= freq_cnt - freq_check;
+               wavetable_ptr <= wavetable_ptr + 1;
+               if (wavetable_ptr = 31 and REG_SOUND3CNT_L_Wave_RAM_Dimension = "1") then
+                  bank_play <= 1 - bank_play;
+               end if;
+            end if;
+   
+            -- length
+            if (soundcycles_length >= 16384) then -- 256 Hz
+               soundcycles_length <= soundcycles_length - 16384;
+               if (length_left > 0 and length_on = '1') then
+                  length_left <= length_left - 1;
+                  if (length_left = 1) then
+                     ch_on <= '0';
+                  end if;
+               end if;
+            end if;
+            
+            -- setting bank from reg
+            if (SOUND3CNT_L_Wave_RAM_Bank_Number_written = '1') then
+               bank_play   <= to_integer(unsigned(REG_SOUND3CNT_L_Wave_RAM_Bank_Number));
+            end if;
+            
+            -- wavetable
+            wave_vol <= waveram(bank_play, to_integer(wavetable_ptr(4 downto 0)));
+            
+            if (REG_SOUND3CNT_H_Force_Volume = "1") then
+               wave_vol_shifted <= to_integer(unsigned(wave_vol)) * 3 / 4;
+            else
+               case volume_shift is
+                  when 0 => wave_vol_shifted <= 0;
+                  when 1 => wave_vol_shifted <= to_integer(unsigned(wave_vol));
+                  when 2 => wave_vol_shifted <= to_integer(unsigned(wave_vol)) / 2;
+                  when 3 => wave_vol_shifted <= to_integer(unsigned(wave_vol)) / 4;
+                  when others => null;
+               end case;
+            end if;
+            
+            -- sound out
+            if (ch_on = '1') and (choutput_on = '1') then
+               sound_out <= to_signed(wave_vol_shifted, 16);
+               sound_on  <= '1';
+            else
+               sound_out <= (others => '0');
+               sound_on  <= '0';
+            end if;
+            
          end if;
       
       end if;
