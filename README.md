@@ -20,21 +20,21 @@ Out of scope:
 
 # Target Boards
 1. Terasic DE2-115 (done)
-2. Terasic DE-10(Mister) (WIP)
+2. Terasic DE-10(Mister) (done)
 3. Analogue Pocket(if jailbreak possible) - future work
 4. Xilinx ZCU104 - future work
 
 # Status: 
 
-~200 games tested until ingame:
+~1600 games tested until ingame:
 - 95% without major issues (no crash, playable)
 - some crashes open due to CPU bugs (don't happen in software model)
 - some bugs open due to unknown reasons (also happen in software model)
 
 VHDL:
 - CPU done
-- Graphic implemented (Mosaic missing)
-- Sound implemented with missing Stereo, Bias, Clipping check
+- Graphic implemented
+- Sound implemented
 - Turbomode fully working
 - saving with EEPROM/SRam/FLASH ok
 - all registers implemented
