@@ -61,8 +61,9 @@ architecture arch of gba_sound is
    signal REG_SOUNDBIAS                : std_logic_vector(SOUNDBIAS                               .upper downto SOUNDBIAS                               .lower) := (others => '0');
                
    signal SOUNDCNT_H_DMA_written  : std_logic;
+   
+   signal gbsound_on          : std_logic := '0';
 
-   signal new_cycles          : unsigned(7 downto 0) := (others => '0');
    signal new_cycles_slow     : unsigned(7 downto 0) := (others => '0');
    signal new_cycles_valid    : std_logic := '0';
    signal bus_cycles_sum      : unsigned(7 downto 0) := (others => '0');
@@ -170,9 +171,8 @@ begin
    port map
    (
       clk100           => clk100, 
-      gb_on            => gb_on,      
-      gb_bus           => gb_bus,          
-      new_cycles       => new_cycles,      
+      gb_on            => gbsound_on,      
+      gb_bus           => gb_bus,           
       new_cycles_valid => new_cycles_valid,
       sound_out        => sound_out_ch1,
       sound_on         => sound_on_ch1 
@@ -198,9 +198,8 @@ begin
    port map
    (
       clk100           => clk100, 
-      gb_on            => gb_on,        
+      gb_on            => gbsound_on,        
       gb_bus           => gb_bus,          
-      new_cycles       => new_cycles,      
       new_cycles_valid => new_cycles_valid,
       sound_out        => sound_out_ch2,
       sound_on         => sound_on_ch2 
@@ -210,9 +209,8 @@ begin
    port map
    (
       clk100           => clk100,     
-      gb_on            => gb_on,        
-      gb_bus           => gb_bus,          
-      new_cycles       => new_cycles,      
+      gb_on            => gbsound_on,        
+      gb_bus           => gb_bus,              
       new_cycles_valid => new_cycles_valid,
       sound_out        => sound_out_ch3,
       sound_on         => sound_on_ch3 
@@ -222,9 +220,8 @@ begin
    port map
    (
       clk100           => clk100,  
-      gb_on            => gb_on,        
-      gb_bus           => gb_bus,          
-      new_cycles       => new_cycles,      
+      gb_on            => gbsound_on,        
+      gb_bus           => gb_bus,             
       new_cycles_valid => new_cycles_valid,
       sound_out        => sound_out_ch4,
       sound_on         => sound_on_ch4 
@@ -292,12 +289,13 @@ begin
    begin
       if rising_edge(clk100) then
         
+         gbsound_on <= gb_on and PSG_FIFO_Master_Enable(PSG_FIFO_Master_Enable'left);
+        
          new_cycles_valid <= '0';
                 
          -- run synchronized when with lockspeed, otherwise use fixed timing so sounds are not pitched up
          -- channels 1-4 are from GB, they still work with 4 MHZ, so clock is divided by 4 here.
-         if (lockspeed = '1') then
-            new_cycles <= x"01";
+         if (lockspeed = '1') then 
             if (bus_cycles_valid = '1') then
                bus_cycles_sum <= bus_cycles_sum + bus_cycles;
             elsif (bus_cycles_sum >= 4) then
@@ -305,8 +303,7 @@ begin
                bus_cycles_sum   <= bus_cycles_sum - 4;
             end if;
          else
-            new_cycles <= x"04";
-            if (new_cycles_slow < 99) then
+            if (new_cycles_slow < 24) then
                new_cycles_slow <= new_cycles_slow + 1;
             else
                new_cycles_slow  <= (others => '0');
