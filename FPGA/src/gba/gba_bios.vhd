@@ -5,9 +5,13 @@ use IEEE.numeric_std.all;
 entity gba_bios is
    port
    (
-      clk     : in std_logic;
-      address : in std_logic_vector(11 downto 0);
-      data    : out std_logic_vector(31 downto 0)
+      clk       : in std_logic;
+      address   : in std_logic_vector(11 downto 0);
+      data      : out std_logic_vector(31 downto 0);
+
+      wraddress : in std_logic_vector(11 downto 0);
+      wrdata    : in std_logic_vector(31 downto 0);
+      wren      : in std_logic
    );
 end entity;
 
@@ -4119,6 +4123,15 @@ begin
    begin
       if rising_edge(clk) then
          data <= rom(to_integer(unsigned(address)));
+      end if;
+   end process;
+
+   process (clk) 
+   begin
+      if rising_edge(clk) then
+         if wren = '1' then
+            rom(to_integer(unsigned(wraddress))) <= wrdata;
+         end if;
       end if;
    end process;
 
