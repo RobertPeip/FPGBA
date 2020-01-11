@@ -8,51 +8,34 @@ In scope:
 - all videomodes including affine and special effects
 - all soundchannels
 - saving as in GBA
-- turbomode(target is 2x Speed)
+- Fast Forward(2-4x Speed depending on game)
 - pixelperfect-scaling with framebuffer
+- CPU Turbo mode
+- Savestates
 
 Out of scope:
 - Multiplayer features like Serial
 - GBA Module function(e.g. Boktai sun sensor)
-- savestates
 - debugging on hardware (VHDL simulation should be enough)
 - all Peripheral like VGA/HDMI, SDRAM, Controller, ....
 
 # Target Boards
 1. Terasic DE2-115 (done)
 2. Terasic DE-10(Mister) (done)
-3. Analogue Pocket(if jailbreak possible) - future work
-4. Xilinx ZCU104 - future work
+3. Nexys Video
+4. Analogue Pocket(if jailbreak possible) - future work
 
 # Status: 
 
 ~1600 games tested until ingame:
-- 95% without major issues (no crash, playable)
-- some crashes open due to CPU bugs (don't happen in software model)
-- some bugs open due to unknown reasons (also happen in software model)
-
-VHDL:
-- CPU done
-- Graphic implemented
-- Sound implemented
-- Turbomode fully working
-- saving with EEPROM/SRam/FLASH ok
-- all registers implemented
-
-Missing big parts:
-- none
-
-Software model, instruction-cycle-based Emulator in C#:
-- all features done
-- Armwrestler Tests 100% pass
-- ~300 Games tested (due to lack of time, most only until getting ingame)
--> considered complete for now, can be used as "known good" for 99%.
+- 99% without major issues (no crash, playable)
 
 # FPGA Ressource usage (GBA only, without Framebuffer)
 
-- 26000 LE (LUTS+FF), 9500 CPU, 8000 GPU
-- 2Mbit Ram used for WRAM fast, VRAM, Palette, OAM
-- WRAM Slow, Gamepak and Saves(EEPROM, SRAM, Flash) are on SDRam.
+- 37000 LE (LUTS+FF), 13000 CPU, 9000 GPU
+- 1,3Mbit Ram used for WRAM fast, VRAM, Palette, OAM
+- 600Kbit used for Framebuffer
+- WRAM Slow, Gamepak and Saves(EEPROM, SRAM, Flash) are on SDRam/DDRRam.
 
 # Accuracy
 
@@ -62,13 +45,13 @@ The suite itself has several thousand single tests. Here is a comparison with mG
 
 Testname | TestCount | FPGBA | mGBA | VBA-M | Higan
 ---------|-----------|-------|------|-------|-------
-Memory   |      1552 |  1538 | 1552 |  1337 | 1552
+Memory   |      1552 |  1552 | 1552 |  1337 | 1552
 IOREAD   |       123 |   123 |  116 |   100 |  123
-Timing   |      1660 |  1408 | 1520 |   628 | 1424
-Timer    |       936 |   443 |  511 |   440 |  464
+Timing   |      1660 |  1554 | 1520 |   628 | 1424
+Timer    |       936 |   445 |  511 |   440 |  464
 Carry    |        93 |    93 |   93 |    93 |   93
 BIOSMath |       625 |   625 |  625 |   425 |  625
-DMATests |      1256 |  1136 | 1160 |  1008 | 1064
+DMATests |      1256 |  1248 | 1160 |  1008 | 1064
 
 
 # Buscycle Accuracy

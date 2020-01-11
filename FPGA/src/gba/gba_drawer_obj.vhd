@@ -18,8 +18,13 @@ entity gba_drawer_obj is
       one_dim_mapping      : in  std_logic;
       Mosaic_H_Size        : in  unsigned(3 downto 0);
       
-      pixel_we             : out std_logic := '0';
-      pixeldata            : out std_logic_vector(18 downto 0) := (others => '0');
+      hblankfree           : in  std_logic;
+      maxpixels            : in  std_logic;
+      
+      pixel_we_color       : out std_logic := '0';
+      pixeldata_color      : out std_logic_vector(15 downto 0) := (others => '0');
+      pixel_we_settings    : out std_logic := '0';
+      pixeldata_settings   : out std_logic_vector(2 downto 0) := (others => '0');
       pixel_x              : out integer range 0 to 239;
       pixel_objwnd         : out std_logic := '0';
       
@@ -85,6 +90,8 @@ architecture arch of gba_drawer_obj is
    
    signal output_ok : std_logic := '0';
    
+   signal wait_busydone : integer range 0 to 7 := 0;
+   
    signal OAM_currentobj : integer range 0 to 127;
    
    signal OAM_data0 : std_logic_vector(15 downto 0) := (others => '0');
@@ -119,8 +126,6 @@ architecture arch of gba_drawer_obj is
    signal posx              : integer range -512 to 511;
    signal sizeX             : integer range 8 to 64;
    signal sizeY             : integer range 8 to 64;
-   signal fieldX            : integer range 8 to 128;
-   signal fieldY            : integer range 8 to 128;
    signal pixeladdr_pre     : integer range 0 to 32767;
    signal pixeladdr         : integer range -32768 to 32767;
        
@@ -211,6 +216,10 @@ architecture arch of gba_drawer_obj is
    signal mosaik_cnt        : integer range 0 to 15 := 0;
    signal mosaik_merge      : std_logic;
    
+   signal pixeltime         : integer range 0 to 32767; -- high number to support free drawing
+   signal pixeltime_current : integer range 0 to 32767;
+   signal maxpixeltime      : integer range 0 to 1210;
+   
 begin 
 
    VRAM_Drawer_addr <= to_integer(pixeladdr_x(14 downto 2));
@@ -221,6 +230,12 @@ begin
       variable tileindex_var : integer range 0 to 1023;
    begin
       if rising_edge(clk100) then
+      
+         if (hblankfree = '1') then
+            maxpixeltime <= 954;
+         else
+            maxpixeltime <= 1210;
+         end if;
 
          if (hblank = '1') then -- immidiatly stop drawing when hblank is reached
          
@@ -233,6 +248,15 @@ begin
             case (OAMFetch) is
             
                when IDLE =>
+                  if (PIXELGen = WAITOAM) then
+                     if (wait_busydone > 0) then
+                        wait_busydone <= wait_busydone - 1;
+                     else
+                        busy          <= '0';
+                     end if;
+                  else
+                     wait_busydone <= 7;
+                  end if;
                   if (drawline = '1') then
                      busy               <= '1';
                      OAM_currentobj     <= 0;
@@ -287,7 +311,6 @@ begin
                   if (OAM_data0(OAM_OFF_HI downto OAM_OFF_LO) = "10" or (unsigned(BG_Mode) >= 3 and tileindex_var < 512)) then
                      if (OAM_currentobj = 127) then
                         OAMFetch <= IDLE;
-                        busy     <= '0';
                      else
                         OAMFetch           <= WAITFIRST;
                         OAMRAM_Drawer_addr <= (OAM_currentobj * 2) + 2;
@@ -298,10 +321,11 @@ begin
                   end if;
                
                when DONE =>
-                  if (PIXELGen = WAITOAM) then
+                  if (maxpixels = '1' and pixeltime >= maxpixeltime) then
+                     OAMFetch <= IDLE;
+                  elsif (PIXELGen = WAITOAM) then
                      if (OAM_currentobj = 127) then
                         OAMFetch <= IDLE;
-                        busy     <= '0';
                      else
                         OAMFetch           <= WAITFIRST;
                         OAMRAM_Drawer_addr <= (OAM_currentobj * 2) + 2;
@@ -319,6 +343,8 @@ begin
    -- Pixelgen
    process (clk100)
       variable posy           : integer range -256 to 255;
+      variable fieldX         : integer range 8 to 128;
+      variable fieldY         : integer range 8 to 128;
       variable xxx            : integer range 0 to 63;
       variable yyy            : integer range 0 to 63;
       variable pixeladdr_calc : integer;
@@ -326,6 +352,10 @@ begin
       if rising_edge(clk100) then
 
          issue_pixel <= '0';
+         
+         if (drawline = '1') then
+            pixeltime <= 0;
+         end if;
 
          case (PIXELGen) is
          
@@ -339,20 +369,14 @@ begin
                   dmx             <= to_integer(signed(OAM_data_aff1));
                   dy              <= to_integer(signed(OAM_data_aff2));
                   dmy             <= to_integer(signed(OAM_data_aff3));
-                  
-                  posy := to_integer(unsigned(OAM_data0(OAM_Y_HI downto OAM_Y_LO)));
-                  if (posy > 16#C0#) then 
-                     posy := posy - 16#100#; 
-                  end if;
-                  if (OAM_data0(OAM_MOSAIC) = '1') then
-                     ty <= ypos_mosaic - posy;
-                  else
-                     ty <= ypos - posy;
-                  end if;
-                  
+
                   posx <= to_integer(unsigned(OAM_data1(OAM_X_HI downto OAM_X_LO)));
                   
-                  pixeladdr_pre <= 32 * to_integer(unsigned(OAM_data2(OAM_TILE_HI downto OAM_TILE_LO)));
+                  if (OAM_data0(OAM_HICOLOR) = '1' and one_dim_mapping = '0') then
+                     pixeladdr_pre <= 32 * to_integer(unsigned(OAM_data2(OAM_TILE_HI downto OAM_TILE_LO+1) & '0'));
+                  else 
+                     pixeladdr_pre <= 32 * to_integer(unsigned(OAM_data2(OAM_TILE_HI downto OAM_TILE_LO)));
+                  end if;
                   
                   case (to_integer(unsigned(OAM_data0(OAM_OBJSHAPE_HI downto OAM_OBJSHAPE_LO)))) is
                      when 0 => -- square
@@ -404,11 +428,21 @@ begin
             when CALCMOSAIC =>
                PIXELGen <= BASEADDR_PRE;
                if (Pixel_data0(OAM_AFFINE) = '1' and Pixel_data0(OAM_DBLSIZE) = '1') then
-                  fieldX <= 2 * sizeX;
-                  fieldY <= 2 * sizeY;
+                  fieldX := 2 * sizeX;
+                  fieldY := 2 * sizeY;
                else
-                  fieldX <= sizeX;
-                  fieldY <= sizeY;
+                  fieldX := sizeX;
+                  fieldY := sizeY;
+               end if;
+
+               posy := to_integer(unsigned(Pixel_data0(OAM_Y_HI downto OAM_Y_LO)));
+               if (posy > (16#100# - fieldY)) then
+                  posy := posy - 16#100#;
+               end if;
+               if (Pixel_data0(OAM_MOSAIC) = '1') then
+                  ty <= ypos_mosaic - posy;
+               else
+                  ty <= ypos - posy;
                end if;
                
                if (Pixel_data0(OAM_HICOLOR) = '0') then
@@ -455,6 +489,14 @@ begin
             when BASEADDR =>
                PIXELGen <= NEXTADDR;
                
+               if (Pixel_data0(OAM_AFFINE) = '1') then
+                  pixeltime         <= pixeltime + 10 + fieldX * 2;
+                  pixeltime_current <= pixeltime + 10;
+               else
+                  pixeltime         <= pixeltime + fieldX;
+                  pixeltime_current <= pixeltime;
+               end if;
+               
                -- affine
                realX <= pixeladdr_pre_a0 - pixeladdr_pre_a1 - pixeladdr_pre_a2 + pixeladdr_pre_a3;
                realY <= pixeladdr_pre_a4 - pixeladdr_pre_a5 - pixeladdr_pre_a6 + pixeladdr_pre_a7;
@@ -475,15 +517,23 @@ begin
                end if;
 
             when NEXTADDR =>
-               if (x >= fieldX) then
+               if (maxpixels = '1' and pixeltime_current >= maxpixeltime) then
+                  PIXELGen <= WAITOAM;
+               elsif (x >= fieldX) then
                   PIXELGen <= WAITOAM;
                else
                   x <= x + 1;
                   if (x + posX > 239) then -- end of line already reached
-                     PIXELGen <= WAITOAM;
+                     PIXELGen  <= WAITOAM;
                   else
                      PIXELGen <= PIXELISSUE;
                   end if;
+               end if;
+               
+               if (Pixel_data0(OAM_AFFINE) = '1') then
+                  pixeltime_current <= pixeltime_current + 2;
+               else
+                  pixeltime_current <= pixeltime_current + 1;
                end if;
                
                skippixel <= '0';
@@ -493,13 +543,6 @@ begin
                else
                   skippixel <= '1';
                end if;
-               
-               --if (mosaic_on && mosaik_h_cnt > 0 && (target - mosaik_h_cnt) >= 0)
-               --{
-               --    pixels_obj[target].copy(pixels_obj[target - mosaik_h_cnt]);
-               --    
-               --}
-               -- if (mosaik_h_cnt >= mosaic_h) { mosaik_h_cnt = 0; } else mosaik_h_cnt++;
                
                if (Pixel_data0(OAM_AFFINE) = '1') then
                   if (realX < 0 or (realX / 256) >= sizeX or realY < 0 or (realY / 256) >= sizeY) then
@@ -688,34 +731,37 @@ begin
          end if;   
          
          -- fourth cycle
-         pixel_we     <= '0';
-         pixel_objwnd <= '0';
-         pixel_x      <= target_merge;
+         pixel_we_color    <= '0';
+         pixel_we_settings <= '0';
+         pixel_objwnd      <= '0';
+         pixel_x           <= target_merge;
          
          if (enable_merge = '1' and mosaik_merge = '0') then
             if (PALETTE_byteaddr(1) = '1') then
-               pixeldata <= Pixel_merge.prio & Pixel_merge.alpha & '0' & PALETTE_Drawer_data(30 downto 16);
+               pixeldata_color <= '0' & PALETTE_Drawer_data(30 downto 16);
             else
-               pixeldata <= Pixel_merge.prio & Pixel_merge.alpha & '0' & PALETTE_Drawer_data(14 downto 0);
+               pixeldata_color <= '0' & PALETTE_Drawer_data(14 downto 0);
             end if;
+            pixeldata_settings <= Pixel_merge.prio & Pixel_merge.alpha;
          end if;
-         
+
          if (enable_merge = '1' and output_ok = '1') then
 
             if (Pixel_merge.transparent = '0' and Pixel_merge.objwnd = '1') then
                pixel_objwnd <= '1';
             end if;
             
-            if (Pixel_merge.transparent = '0' and Pixel_merge.objwnd = '0') then
+            if (Pixel_merge.objwnd = '0') then
                if (Pixel_readback.transparent = '1' or unsigned(Pixel_merge.prio) < unsigned(Pixel_readback.prio)) then
-               
-                  pixel_we  <= '1';
-
-                  pixelarray(target_merge).prio        <= Pixel_merge.prio;
-                  pixelarray(target_merge).transparent <= '0';
-
+                  pixel_we_settings             <= '1';
+                  pixelarray(target_merge).prio <= Pixel_merge.prio;
+                  if (Pixel_merge.transparent = '0') then
+                     pixel_we_color                       <= '1';
+                     pixelarray(target_merge).transparent <= '0';
+                  end if;
                end if;
             end if; 
+            
          end if;
       
       end if;

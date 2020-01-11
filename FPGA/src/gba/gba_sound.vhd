@@ -388,16 +388,16 @@ begin
 
          -- mix in dma sound
          if (sound_on_dmaA = '1') then
-            soundmix6_l <= soundmix5_l + sound_out_dmaA_l;
-            soundmix6_r <= soundmix5_r + sound_out_dmaA_r;
+            soundmix6_l <= soundmix5_l - sound_out_dmaA_l;
+            soundmix6_r <= soundmix5_r - sound_out_dmaA_r;
          else
             soundmix6_l <= soundmix5_l;
             soundmix6_r <= soundmix5_r;
          end if;
          
          if (sound_on_dmaB = '1') then
-            soundmix7_l <= soundmix6_l + sound_out_dmaB_l;
-            soundmix7_r <= soundmix6_r + sound_out_dmaB_r;
+            soundmix7_l <= soundmix6_l - sound_out_dmaB_l;
+            soundmix7_r <= soundmix6_r - sound_out_dmaB_r;
          else
             soundmix7_l <= soundmix6_l;
             soundmix7_r <= soundmix6_r;
@@ -407,7 +407,7 @@ begin
          soundmix8_l <= soundmix7_l; -- + to_integer(unsigned(REG_SOUNDBIAS));
          soundmix8_r <= soundmix7_r; -- + to_integer(unsigned(REG_SOUNDBIAS));
 
-         -- clipping
+         -- clipping, only for turbosound
          if (soundmix8_l < -512) then
             soundmix9_l <= to_signed(-512, 10);
          elsif (soundmix8_l > 511) then
@@ -488,10 +488,10 @@ begin
          end if;
       end process;
    
-      sound_out_left  <= std_logic_vector(resize(soundmix9_l       * 16, 16)) when PSG_FIFO_Master_Enable = "1" and lockspeed = '1' else 
+      sound_out_left  <= std_logic_vector(resize(soundmix8_l       * 16, 16)) when PSG_FIFO_Master_Enable = "1" and lockspeed = '1' else 
                          std_logic_vector(resize(signed(fifo_Dout) * 32, 16)) when PSG_FIFO_Master_Enable = "1" and lockspeed = '0' else 
                          (others => '0');
-      sound_out_right <= std_logic_vector(resize(soundmix9_r       * 16, 16)) when PSG_FIFO_Master_Enable = "1" and lockspeed = '1' else 
+      sound_out_right <= std_logic_vector(resize(soundmix8_r       * 16, 16)) when PSG_FIFO_Master_Enable = "1" and lockspeed = '1' else 
                          std_logic_vector(resize(signed(fifo_Dout) * 32, 16)) when PSG_FIFO_Master_Enable = "1" and lockspeed = '0' else 
                          (others => '0');
 
@@ -500,11 +500,11 @@ begin
    gnoturbosound : if turbosound = '0' generate
    begin
    
-      sound_out_left  <= std_logic_vector(resize(soundmix9_l * 16, 16)) when PSG_FIFO_Master_Enable = "1" and lockspeed = '1' else 
-                         std_logic_vector(resize(soundmix9_l *  4, 16)) when PSG_FIFO_Master_Enable = "1" and lockspeed = '0' else 
+      sound_out_left  <= std_logic_vector(resize(soundmix8_l * 16, 16)) when PSG_FIFO_Master_Enable = "1" and lockspeed = '1' else 
+                         std_logic_vector(resize(soundmix8_l * 4, 16)) when PSG_FIFO_Master_Enable = "1" and lockspeed = '0' else 
                          (others => '0');
-      sound_out_right <= std_logic_vector(resize(soundmix9_r * 16, 16)) when PSG_FIFO_Master_Enable = "1" and lockspeed = '1' else 
-                         std_logic_vector(resize(soundmix9_r *  4, 16)) when PSG_FIFO_Master_Enable = "1" and lockspeed = '0' else 
+      sound_out_right <= std_logic_vector(resize(soundmix8_r * 16, 16)) when PSG_FIFO_Master_Enable = "1" and lockspeed = '1' else 
+                         std_logic_vector(resize(soundmix8_r * 4, 16)) when PSG_FIFO_Master_Enable = "1" and lockspeed = '0' else 
                          (others => '0');
    
    end generate;

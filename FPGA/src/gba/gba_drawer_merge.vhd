@@ -11,8 +11,6 @@ entity gba_drawer_merge is
       xpos                 : in  integer range 0 to 239;
       ypos                 : in  integer range 0 to 159;
       
-      BG0_on               : in  std_logic;
-      BG1_on               : in  std_logic;
       WND0_on              : in  std_logic;
       WND1_on              : in  std_logic;
       WNDOBJ_on            : in  std_logic;
@@ -331,18 +329,25 @@ begin
          
          secondprio_var := enables_cycle2 and (not firstprio_var);
          
-         if (secondprio_var(BG0) = '1' and secondprio_var(OBJ) = '1') then if (unsigned(pixeldata_obj_cycle2(OBJPRIOH downto OBJPRIOL)) > Prio_BG0) then secondprio_var(OBJ) := '0'; else secondprio_var(BG0) := '0'; end if; end if;
-         if (secondprio_var(BG1) = '1' and secondprio_var(OBJ) = '1') then if (unsigned(pixeldata_obj_cycle2(OBJPRIOH downto OBJPRIOL)) > Prio_BG1) then secondprio_var(OBJ) := '0'; else secondprio_var(BG1) := '0'; end if; end if;
-         if (secondprio_var(BG2) = '1' and secondprio_var(OBJ) = '1') then if (unsigned(pixeldata_obj_cycle2(OBJPRIOH downto OBJPRIOL)) > Prio_BG2) then secondprio_var(OBJ) := '0'; else secondprio_var(BG2) := '0'; end if; end if;
-         if (secondprio_var(BG3) = '1' and secondprio_var(OBJ) = '1') then if (unsigned(pixeldata_obj_cycle2(OBJPRIOH downto OBJPRIOL)) > Prio_BG3) then secondprio_var(OBJ) := '0'; else secondprio_var(BG3) := '0'; end if; end if;
-         
-         if (secondprio_var(BG0) = '1' and secondprio_var(BG1) = '1') then if (Prio_BG0 > Prio_BG1) then secondprio_var(BG0) := '0'; else secondprio_var(BG1) := '0'; end if; end if;
-         if (secondprio_var(BG0) = '1' and secondprio_var(BG2) = '1') then if (Prio_BG0 > Prio_BG2) then secondprio_var(BG0) := '0'; else secondprio_var(BG2) := '0'; end if; end if;
-         if (secondprio_var(BG0) = '1' and secondprio_var(BG3) = '1') then if (Prio_BG0 > Prio_BG3) then secondprio_var(BG0) := '0'; else secondprio_var(BG3) := '0'; end if; end if;
-         if (secondprio_var(BG1) = '1' and secondprio_var(BG2) = '1') then if (Prio_BG1 > Prio_BG2) then secondprio_var(BG1) := '0'; else secondprio_var(BG2) := '0'; end if; end if;
-         if (secondprio_var(BG1) = '1' and secondprio_var(BG3) = '1') then if (Prio_BG1 > Prio_BG3) then secondprio_var(BG1) := '0'; else secondprio_var(BG3) := '0'; end if; end if;
-         if (secondprio_var(BG2) = '1' and secondprio_var(BG3) = '1') then if (Prio_BG2 > Prio_BG3) then secondprio_var(BG2) := '0'; else secondprio_var(BG3) := '0'; end if; end if;
-            
+         if (secondprio_var(BG0) = '1' and secondprio_var(OBJ) = '1' and unsigned(pixeldata_obj_cycle2(OBJPRIOH downto OBJPRIOL)) > Prio_BG0) then secondprio_var(OBJ) := '0'; end if;
+         if (secondprio_var(BG1) = '1' and secondprio_var(OBJ) = '1' and unsigned(pixeldata_obj_cycle2(OBJPRIOH downto OBJPRIOL)) > Prio_BG1) then secondprio_var(OBJ) := '0'; end if;
+         if (secondprio_var(BG2) = '1' and secondprio_var(OBJ) = '1' and unsigned(pixeldata_obj_cycle2(OBJPRIOH downto OBJPRIOL)) > Prio_BG2) then secondprio_var(OBJ) := '0'; end if;
+         if (secondprio_var(BG3) = '1' and secondprio_var(OBJ) = '1' and unsigned(pixeldata_obj_cycle2(OBJPRIOH downto OBJPRIOL)) > Prio_BG3) then secondprio_var(OBJ) := '0'; end if;
+
+         if (secondprio_var(BG0) = '1' and secondprio_var(BG1) = '1' and Prio_BG0 > Prio_BG1) then secondprio_var(BG0) := '0'; end if;
+         if (secondprio_var(BG0) = '1' and secondprio_var(BG2) = '1' and Prio_BG0 > Prio_BG2) then secondprio_var(BG0) := '0'; end if;
+         if (secondprio_var(BG0) = '1' and secondprio_var(BG3) = '1' and Prio_BG0 > Prio_BG3) then secondprio_var(BG0) := '0'; end if;
+         if (secondprio_var(BG1) = '1' and secondprio_var(BG2) = '1' and Prio_BG1 > Prio_BG2) then secondprio_var(BG1) := '0'; end if;
+         if (secondprio_var(BG1) = '1' and secondprio_var(BG3) = '1' and Prio_BG1 > Prio_BG3) then secondprio_var(BG1) := '0'; end if;
+         if (secondprio_var(BG2) = '1' and secondprio_var(BG3) = '1' and Prio_BG2 > Prio_BG3) then secondprio_var(BG2) := '0'; end if;
+
+         if    (secondprio_var(OBJ) = '1') then secondprio_var := "010000";
+         elsif (secondprio_var(BG0) = '1') then secondprio_var := "000001";
+         elsif (secondprio_var(BG1) = '1') then secondprio_var := "000010";
+         elsif (secondprio_var(BG2) = '1') then secondprio_var := "000100";
+         elsif (secondprio_var(BG3) = '1') then secondprio_var := "001000";
+         else                                   secondprio_var := "100000"; end if;
+
          secondprio_cycle3 <= secondprio_var and second_target;
          
          -- special effect data
@@ -363,8 +368,6 @@ begin
    -- ####################################
    process (clk100)
       variable special_effect_var : unsigned(1 downto 0);
-      variable prio1              : unsigned(1 downto 0);
-      variable prio2              : unsigned(1 downto 0);
       variable secondpixel        : std_logic_vector(14 downto 0);
    begin
       if rising_edge(clk100) then
@@ -382,32 +385,14 @@ begin
          -- special effect control
          special_effect_var   := special_effect_in;
          special_out_cycle4   <= '0';
-      
-         if ((special_enable_cycle3 = '1' and special_effect_in > 0) or pixeldata_obj_cycle3(OBJALPHA) = '1') then
+
+         if (special_enable_cycle3 = '1' and special_effect_in > 0) then
       
             if (firstprio_cycle3 /= "000000") then
             
-               if (pixeldata_obj_cycle3(OBJALPHA) = '1' and firstprio_cycle3(4 downto 0) = "10000") then
-                  special_effect_var := "01";
-               end if;
-            
-               if (special_effect_var = "01") then
-                  
-                  prio1 := "00";
-                  if    (firstprio_cycle3(OBJ) = '1') then prio1 := unsigned(pixeldata_obj_cycle3(OBJPRIOH downto OBJPRIOL));
-                  elsif (firstprio_cycle3(BG0) = '1') then prio1 := Prio_BG0;
-                  elsif (firstprio_cycle3(BG1) = '1') then prio1 := Prio_BG1;
-                  elsif (firstprio_cycle3(BG2) = '1') then prio1 := Prio_BG2;
-                  elsif (firstprio_cycle3(BG3) = '1') then prio1 := Prio_BG3; end if;                      
-               
-                  prio2 := "00";
-                  if    (secondprio_cycle3(OBJ) = '1') then prio2 := unsigned(pixeldata_obj_cycle3(OBJPRIOH downto OBJPRIOL));
-                  elsif (secondprio_cycle3(BG0) = '1') then prio2 := Prio_BG0;
-                  elsif (secondprio_cycle3(BG1) = '1') then prio2 := Prio_BG1;
-                  elsif (secondprio_cycle3(BG2) = '1') then prio2 := Prio_BG2;
-                  elsif (secondprio_cycle3(BG3) = '1') then prio2 := Prio_BG3; end if;                  
-               
-                  if (secondprio_cycle3 /= "000000" and prio2 >= prio1) then
+               if (special_effect_in = "01") then
+
+                  if (secondprio_cycle3 /= "000000") then
                      special_out_cycle4  <= '1';
                   end if;
                
@@ -422,6 +407,11 @@ begin
             
          end if;
          
+         if (pixeldata_obj_cycle3(OBJALPHA) = '1' and firstprio_cycle3(4 downto 0) = "10000" and secondprio_cycle3 /= "000000") then
+            special_effect_var := "01";
+            special_out_cycle4 <= '1';
+         end if;
+
          special_effect_cycle4 <= special_effect_var;
       
          -- special effect data
