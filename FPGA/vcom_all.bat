@@ -15,6 +15,7 @@ src/gba/reggba_sound.vhd ^
 src/gba/reggba_display.vhd ^
 src/gba/reggba_dma.vhd ^
 src/gba/reggba_system.vhd ^
+src/gba/reg_savestates.vhd ^
 src/gba/gba_bios.vhd ^
 src/gba/gba_reservedregs.vhd ^
 src/gba/gba_sound_ch1.vhd ^
@@ -26,10 +27,16 @@ src/gba/gba_joypad.vhd ^
 src/gba/gba_serial.vhd ^
 src/gba/gba_dma_module.vhd ^
 src/gba/gba_dma.vhd ^
+src/gba/cache.vhd ^
+src/gba/gba_cheats.vhd ^
 src/gba/gba_memorymux.vhd ^
 src/gba/gba_timer_module.vhd ^
 src/gba/gba_timer.vhd ^
+src/gba/gba_statemanager.vhd ^
+src/gba/gba_savestates.vhd ^
+src/gba/gba_gpiodummy.vhd ^
 src/gba/gba_gpu_timing.vhd ^
+src/gba/gba_gpu_colorshade.vhd ^
 src/gba/gba_drawer_mode0.vhd ^
 src/gba/gba_drawer_mode2.vhd ^
 src/gba/gba_drawer_mode345.vhd ^

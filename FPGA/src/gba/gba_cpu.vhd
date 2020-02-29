@@ -27,7 +27,7 @@ entity gba_cpu is
       gb_bus_din       : in    std_logic_vector(31 downto 0);
       gb_bus_done      : in    std_logic;
         
-      wait_cnt_value   : in    unsigned(15 downto 0);
+      wait_cnt_value   : in    unsigned(14 downto 0);
       wait_cnt_update  : in    std_logic;
         
       bus_lowbits      : out   std_logic_vector(1 downto 0) := "00";
@@ -102,7 +102,8 @@ architecture arch of gba_cpu is
 
    type t_regs is array(0 to 17) of unsigned(31 downto 0);
    signal regs : t_regs := (others => (others => '0'));
-   signal regs_plus_12 : unsigned(31 downto 0);
+   signal regs_plus_12  : unsigned(31 downto 0);
+   signal block_pc_next : unsigned(31 downto 0);
 
    signal PC               : unsigned(31 downto 0) := (others => '0');
 
@@ -339,9 +340,12 @@ architecture arch of gba_cpu is
    signal decode_block_switchmode         : std_logic := '0';
    signal decode_block_addrmod            : integer range -64 to 64 := 0;
    signal decode_block_endmod             : integer range -64 to 64 := 0;
+   signal decode_block_addrmod_baseRlist  : integer range -64 to 64 := 0;
    signal decode_block_reglist            : std_logic_vector(15 downto 0) := (others => '0');
+   signal decode_block_emptylist          : std_logic := '0';
    signal decode_psr_with_spsr            : std_logic := '0';
    signal decode_leaveirp                 : std_logic := '0';
+   signal decode_leaveirp_user            : std_logic := '0';
    
    signal execute_functions_detail : tFunctions_detail;
    signal execute_datareceivetype  : tdatareceivetype;
@@ -378,9 +382,12 @@ architecture arch of gba_cpu is
    signal execute_block_switchmode        : std_logic := '0';
    signal execute_block_addrmod           : integer range -64 to 64 := 0;
    signal execute_block_endmod            : integer range -64 to 64 := 0;
+   signal execute_block_addrmod_baseRlist : integer range -64 to 64 := 0;
    signal execute_block_reglist           : std_logic_vector(15 downto 0) := (others => '0');
+   signal execute_block_emptylist         : std_logic := '0';
    signal execute_psr_with_spsr           : std_logic := '0';
    signal execute_leaveirp                : std_logic := '0';
+   signal execute_leaveirp_user           : std_logic := '0';
    
    -- ############# ALU ##############
    type talu_stage is
@@ -492,6 +499,7 @@ architecture arch of gba_cpu is
    
    signal block_regindex   : integer range 0 to 15;
    signal endaddress       : unsigned(31 downto 0) := (others => '0');
+   signal endaddressRlist  : unsigned(31 downto 0) := (others => '0');
    signal block_writevalue : unsigned(31 downto 0) := (others => '0');
    signal block_reglist    : std_logic_vector(15 downto 0) := (others => '0');
    signal block_switch_pc  : unsigned(31 downto 0) := (others => '0');
@@ -631,7 +639,7 @@ begin
    
    gb_bus_Adr <= bus_fetch_Adr  when fetch_ack = '1' else bus_execute_Adr;
    gb_bus_rnw <= bus_fetch_rnw  when fetch_ack = '1' else bus_execute_rnw;
-   gb_bus_ena <= not branchnext when fetch_ack = '1' else bus_execute_ena;
+   gb_bus_ena <= '1'            when fetch_ack = '1' else bus_execute_ena;
    gb_bus_acc <= bus_fetch_acc  when fetch_ack = '1' else bus_execute_acc;
    
    PC_in_BIOS <= '1' when bus_fetch_Adr(27 downto 24) = x"0" else '0';
@@ -758,6 +766,12 @@ begin
                   if (decode_request = '0') then
                      fetch_available <= '1';
                      fetch_data      <= gb_bus_din;
+                     
+                     --For THUMB code in 32K - WRAM on GBA, GBA SP, GBA Micro, NDS-Lite(but not NDS):
+                     --LSW = [$+4], MSW = OldHI   ; for opcodes at 4 - byte aligned locations
+                     --LSW = OldLO, MSW = [$+4]   ; for opcodes at non - 4 - byte aligned locations
+                     --OldLO=[$+2], OldHI=[$+2]
+                     
                      if (thumbmode = '1') then
                         if (PC(27 downto 24) = x"3") then
                            if (PC(1) = '0') then
@@ -766,7 +780,7 @@ begin
                               lastread(15 downto 0) <= gb_bus_din(15 downto 0);
                            end if;
                         else
-                           lastread <= gb_bus_din(15 downto 0) & gb_bus_din(15 downto 0);
+                           lastread <= gb_bus_din(15 downto 0) & gb_bus_din(15 downto 0); -- standard case LSW = [$+4], MSW = [$+4]
                         end if;
                      else
                         lastread <= gb_bus_din;
@@ -789,10 +803,6 @@ begin
                      fetch_ack  <= '1';
                      wait_fetch <= '1';
                   end if;
-               end if;
-               
-               if (fetch_ack = '1' and branchnext = '1') then
-                  wait_fetch <= '0';
                end if;
 
                if (gb_bus_done = '1' and skip_pending_fetch = '1') then
@@ -1064,7 +1074,12 @@ begin
                      else
                         regs(15)(decode_PC'left downto 0) <= decode_PC + 4;
                      end if;
-                     regs_plus_12 <= decode_PC + 8; -- only used for data operation available in arm mode
+                     regs_plus_12  <= decode_PC + 8; -- only used for data operation available in arm mode
+                     if (thumbmode = '1') then
+                        block_pc_next <= decode_PC + 4;
+                     else
+                        block_pc_next <= decode_PC + 8;
+                     end if;
                   
                      execute_skip := '1';
                      case (decode_condition) is
@@ -1138,9 +1153,12 @@ begin
                      execute_block_switchmode         <= decode_block_switchmode; 
                      execute_block_addrmod            <= decode_block_addrmod; 
                      execute_block_endmod             <= decode_block_endmod; 
+                     execute_block_addrmod_baseRlist  <= decode_block_addrmod_baseRlist; 
                      execute_block_reglist            <= decode_block_reglist; 
+                     execute_block_emptylist          <= decode_block_emptylist; 
                      execute_psr_with_spsr            <= decode_psr_with_spsr; 
                      execute_leaveirp                 <= decode_leaveirp; 
+                     execute_leaveirp_user            <= decode_leaveirp_user; 
                      
                   end if;
                
@@ -1598,7 +1616,8 @@ begin
                      decode_datacomb(20)            := decode_data(11); -- Load
                      decode_datacomb(19 downto 16)  := '0' & decode_data(10 downto 8); -- base register
                      decode_datacomb(15 downto 0)   := x"00" & decode_data(7 downto 0); -- reglist
-                     decode_functions := block_data_transfer;
+                     bitcount8_high                 := 0;
+                     decode_functions               := block_data_transfer;
                      --multiple_load_store(((asmcmd >> 11) & 1) == 1, (byte)((asmcmd >> 8) & 0x7), (byte)(asmcmd & 0xFF));
                   else
                      if (decode_data(11 downto 8) = x"F") then
@@ -1651,6 +1670,7 @@ begin
          decode_datatransfer_swap      <= '0';
          decode_datatransfer_writeback <= '0';
          decode_leaveirp               <= '0';
+         decode_leaveirp_user          <= '0';
          
          decode_shiftsettings    <= decode_datacomb(11 downto 4);
    
@@ -1717,6 +1737,10 @@ begin
                   
                   if ((unsigned(opcode) < 8 or unsigned(opcode) >= 12) and Rdest = x"F" and updateflags = '1') then
                      decode_leaveirp <= '1';
+                     if (cpu_mode = CPUMODE_SYSTEM or cpu_mode = CPUMODE_USER) then
+                        decode_leaveirp_user <= '1';
+                        decode_updateflags   <= '0';
+                     end if;
                   end if;
                
                end if;
@@ -1767,7 +1791,7 @@ begin
                decode_datatransfer_preadd    <= opcode(3);
                decode_datatransfer_addup     <= opcode(2);
                decode_datatransfer_writeback <= (not opcode(3)) or opcode(0);
-               if (Rn_op1 = Rdest) then -- maybe store if it's a write? emulator does not
+               if (Rn_op1 = Rdest and decode_datacomb(20) = '1') then --when storing, result address can be written
                   decode_datatransfer_writeback <= '0';
                end if;
                
@@ -1826,6 +1850,12 @@ begin
                if (decode_datacomb(to_integer(unsigned(Rn_op1))) = '1' and decode_datacomb(20) = '1') then -- writeback in reglist and load
                   decode_datatransfer_writeback <= '0';
                end if;
+               if (decode_datacomb(15 downto 0) = x"0000") then -- reglist empty
+                  decode_block_reglist(15) <= '1';
+                  decode_block_emptylist   <= '1';
+               else
+                  decode_block_emptylist   <= '0';
+               end if;
                
                decode_block_usermoderegs <= '0';
                decode_block_switchmode   <= '0';
@@ -1841,14 +1871,29 @@ begin
                decode_block_addrmod <= 0;
                decode_block_endmod  <= 0;
                if (opcode(2) = '0') then -- down
-                  decode_block_endmod <= (-4) * (bitcount8_low + bitcount8_high);
-                  if (opcode(3) = '0') then -- not pre
-                     decode_block_addrmod <= ((-4) * (bitcount8_low + bitcount8_high)) + 4;
+                  if (decode_datacomb(15 downto 0) = x"0000") then -- reglist empty
+                     decode_block_endmod  <= -64;
+                     decode_block_addrmod <= -64;
+                     if (opcode(3) = '0') then -- not pre
+                        decode_block_addrmod <= -60;
+                     end if;
                   else
-                     decode_block_addrmod <= (-4) * (bitcount8_low + bitcount8_high);
+                     decode_block_endmod <= (-4) * (bitcount8_low + bitcount8_high);
+                     if (opcode(3) = '0') then -- not pre
+                        decode_block_addrmod <= ((-4) * (bitcount8_low + bitcount8_high)) + 4;
+                     else
+                        decode_block_addrmod <= (-4) * (bitcount8_low + bitcount8_high);
+                     end if;
+                     decode_block_addrmod_baseRlist <= (-4) * (bitcount8_low + bitcount8_high);
                   end if;
                elsif (opcode(3) = '1') then -- pre
                   decode_block_addrmod <= 4;
+               end if;
+               if (opcode(2) = '1') then --up
+                  decode_block_addrmod_baseRlist <= 4 * (bitcount8_low + bitcount8_high);
+                  if (decode_datacomb(15 downto 0) = x"0000") then -- empty list
+                     decode_block_endmod <= 64;
+                  end if;
                end if;
                
             when software_interrupt => 
@@ -2142,6 +2187,9 @@ begin
                            execute_addcycles  <= 1;
                            prefetch_addcycles <= 1;
                            busPrefetchAdd     <= '1';
+                           if (execute_Rn_op1 = x"F") then
+                              alu_op1 <= regs_plus_12;
+                           end if;
                         end if;
                         
                      when ALUSHIFTWAIT =>
@@ -2285,18 +2333,23 @@ begin
                         execute_saveregs       <= '1';
                         execute_saveState      <= '0';
                         execute_switchregs     <= '1';
-                        if ((cpu_mode = CPUMODE_USER and std_logic_vector(regs(17)(3 downto 0)) = CPUMODE_SYSTEM) or (cpu_mode = CPUMODE_SYSTEM and std_logic_vector(regs(17)(3 downto 0)) = CPUMODE_USER)) then
+                        if (
+                              (cpu_mode = CPUMODE_USER   and (std_logic_vector(regs(17)(3 downto 0)) = CPUMODE_USER or std_logic_vector(regs(17)(3 downto 0)) = CPUMODE_SYSTEM)) or
+                              (cpu_mode = CPUMODE_SYSTEM and (std_logic_vector(regs(17)(3 downto 0)) = CPUMODE_USER or std_logic_vector(regs(17)(3 downto 0)) = CPUMODE_SYSTEM))
+                          ) then
                            execute_switchregs  <= '0';
                         end if;
                         cpu_mode_old           <= cpu_mode;
-                        cpu_mode               <= std_logic_vector(regs(17)(3 downto 0));
-                        thumbmode              <= regs(17)(5);
-                        FIQ_disable            <= regs(17)(6);
-                        IRQ_disable            <= regs(17)(7);
-                        Flag_Negative          <= regs(17)(31);
-                        Flag_Zero              <= regs(17)(30);
-                        Flag_Carry             <= regs(17)(29);
-                        Flag_V_Overflow        <= regs(17)(28);
+                        if (execute_leaveirp_user = '0') then
+                           cpu_mode               <= std_logic_vector(regs(17)(3 downto 0));
+                           thumbmode              <= regs(17)(5);
+                           FIQ_disable            <= regs(17)(6);
+                           IRQ_disable            <= regs(17)(7);
+                           Flag_Negative          <= regs(17)(31);
+                           Flag_Zero              <= regs(17)(30);
+                           Flag_Carry             <= regs(17)(29);
+                           Flag_V_Overflow        <= regs(17)(28);
+                        end if;
                
                   end case;
                   
@@ -2439,7 +2492,7 @@ begin
                      when MSR_START =>
                         if (execute_start = '1') then
                            if (execute_alu_use_immi = '1') then
-                              msr_value <= execute_immidiate(31 downto 24) & x"000000"; -- immidiate is for flags only
+                              msr_value <= execute_immidiate(31 downto 24) & x"00000" & execute_immidiate(3 downto 0); -- immidiate is for flags only
                            else
                               msr_value <= regs(to_integer(unsigned(execute_Rm_op2)));
                            end if;
@@ -2455,7 +2508,7 @@ begin
                         MSR_Stage <= MSR_START;
                         calc_done <= '1';
                         execute_writeback_r17 <= '1';
-                        if (cpu_mode /= CPUMODE_USER and cpu_mode /= CPUMODE_SYSTEM) then
+                        if (cpu_mode /= CPUMODE_USER) then
                            if (execute_Rn_op1(0) = '1') then msr_writebackvalue( 7 downto  0) <= msr_value( 7 downto  0); end if;
                            if (execute_Rn_op1(1) = '1') then msr_writebackvalue(15 downto  8) <= msr_value(15 downto  8); end if;
                            if (execute_Rn_op1(2) = '1') then msr_writebackvalue(23 downto 16) <= msr_value(23 downto 16); end if;
@@ -2481,7 +2534,10 @@ begin
                         if (cpu_mode /= std_logic_vector(new_value(3 downto 0))) then
                            execute_switchregs <= '1';
                         end if;
-                        if ((cpu_mode = CPUMODE_USER and std_logic_vector(new_value(3 downto 0)) = CPUMODE_SYSTEM) or (cpu_mode = CPUMODE_SYSTEM and std_logic_vector(new_value(3 downto 0)) = CPUMODE_USER)) then
+                        if (
+                              (cpu_mode = CPUMODE_USER   and (std_logic_vector(new_value(3 downto 0)) = CPUMODE_USER or std_logic_vector(new_value(3 downto 0)) = CPUMODE_SYSTEM)) or
+                              (cpu_mode = CPUMODE_SYSTEM and (std_logic_vector(new_value(3 downto 0)) = CPUMODE_USER or std_logic_vector(new_value(3 downto 0)) = CPUMODE_SYSTEM))
+                          ) then
                            execute_switchregs  <= '0';
                         end if;
                         execute_saveregs   <= '1';
@@ -2717,6 +2773,7 @@ begin
                            block_regindex   <= 0;
                            busaddress       <= to_unsigned(to_integer(regs(to_integer(unsigned(execute_Rn_op1)))(busaddress'left downto 0)) + execute_block_addrmod, busaddress'length);
                            endaddress       <= to_unsigned(to_integer(regs(to_integer(unsigned(execute_Rn_op1)))(busaddress'left downto 0)) + execute_block_endmod, busaddress'length);
+                           endaddressRlist  <= to_unsigned(to_integer(regs(to_integer(unsigned(execute_Rn_op1)))(busaddress'left downto 0)) + execute_block_addrmod_baseRlist, busaddress'length);          
                            block_reglist    <= execute_block_reglist;
                            block_rw_stage   <= BLOCKCHECKNEXT;
                            block_switch_pc  <= execute_PC;
@@ -2752,6 +2809,9 @@ begin
                               else
                                  busaddress <= endaddress;
                               end if;
+                              if (execute_block_emptylist = '1') then
+                                 busaddress <= endaddress;
+                              end if;
                            elsif (execute_block_switchmode = '1') then
                               block_rw_stage         <= BLOCKSWITCHMODE;
                            else
@@ -2776,8 +2836,10 @@ begin
                               when 14 => block_writevalue <= regs_0_14;
                               when others => block_writevalue <= (others => '0'); -- never happens in armwrestler or suite...
                            end case;
-                        elsif (block_regindex = 15) then  -- pc is + 12 for block writes
-                           block_writevalue     <= regs_plus_12;  
+                        elsif (block_regindex = 15) then  -- pc is +6/12 for block writes
+                           block_writevalue     <= block_pc_next;  
+                        elsif (first_mem_access = '0' and to_integer(unsigned(execute_Rn_op1)) = block_regindex) then
+                           block_writevalue     <= endaddressRlist;
                         else
                            block_writevalue     <= regs(block_regindex);
                         end if;
@@ -2879,7 +2941,10 @@ begin
                         calc_done          <= '1';
                         execute_saveState  <= '1';
                         execute_switchregs <= '1';
-                        if ((cpu_mode = CPUMODE_USER and std_logic_vector(regs(17)(3 downto 0)) = CPUMODE_SYSTEM) or (cpu_mode = CPUMODE_SYSTEM and std_logic_vector(regs(17)(3 downto 0)) = CPUMODE_USER)) then
+                        if (
+                              (cpu_mode = CPUMODE_USER   and (std_logic_vector(regs(17)(3 downto 0)) = CPUMODE_USER or std_logic_vector(regs(17)(3 downto 0)) = CPUMODE_SYSTEM)) or
+                              (cpu_mode = CPUMODE_SYSTEM and (std_logic_vector(regs(17)(3 downto 0)) = CPUMODE_USER or std_logic_vector(regs(17)(3 downto 0)) = CPUMODE_SYSTEM))
+                          ) then
                            execute_switchregs  <= '0';
                         end if;
                         execute_saveregs   <= '1';

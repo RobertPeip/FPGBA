@@ -18,6 +18,7 @@ entity gba_gpu_drawer is
       
       gb_bus               : inout proc_bus_gb_type := ((others => 'Z'), (others => 'Z'), (others => 'Z'), 'Z', 'Z', 'Z', "ZZ", "ZZZZ", 'Z');                  
         
+      lockspeed            : in    std_logic;
       interframe_blend     : in    std_logic;
       maxpixels            : in    std_logic;
       
@@ -30,10 +31,13 @@ entity gba_gpu_drawer is
       pixel_out_we         : out   std_logic := '0';
                            
       linecounter          : in    unsigned(7 downto 0);
+      pixelpos             : in    integer range 0 to 511;
       drawline             : in    std_logic;
       refpoint_update      : in    std_logic;
       hblank_trigger       : in    std_logic;
       vblank_trigger       : in    std_logic;
+      line_trigger         : in    std_logic;
+      newline_invsync      : in    std_logic;
       
       VRAM_Lo_addr         : in    integer range 0 to 16383;
       VRAM_Lo_datain       : in    std_logic_vector(31 downto 0);
@@ -245,6 +249,7 @@ architecture arch of gba_gpu_drawer is
    
    -- background multiplexing
    signal drawline_1           : std_logic := '0';
+   signal hblank_trigger_1     : std_logic := '0';
    
    signal drawline_mode0_0     : std_logic;
    signal drawline_mode0_1     : std_logic;
@@ -355,6 +360,7 @@ architecture arch of gba_gpu_drawer is
    signal linebuffer_objwindow   : std_logic_vector(0 to 239) := (others => '0');
                                  
    -- merge_pixel                
+   signal pixeldata_back_next    : std_logic_vector(15 downto 0) := (others => '0');
    signal pixeldata_back         : std_logic_vector(15 downto 0) := (others => '0');
    signal merge_enable           : std_logic := '0';
    signal merge_enable_1         : std_logic := '0';
@@ -384,7 +390,7 @@ architecture arch of gba_gpu_drawer is
    type tdrawstate is
    (
       IDLE,
-      WAITDRAW,
+      WAITHBLANK,
       DRAWING,
       MERGING
    );
@@ -721,6 +727,8 @@ begin
       clk100               => clk100,
       drawline             => drawline_mode0_0,
       busy                 => busy_mode0_0,
+      lockspeed            => lockspeed,
+      pixelpos             => pixelpos, 
       ypos                 => linecounter_int,
       ypos_mosaic          => linecounter_mosaic_bg,
       mapbase              => unsigned(REG_BG0CNT_Screen_Base_Block),
@@ -748,6 +756,8 @@ begin
       clk100               => clk100,
       drawline             => drawline_mode0_1,
       busy                 => busy_mode0_1,
+      lockspeed            => lockspeed,
+      pixelpos             => pixelpos,
       ypos                 => linecounter_int,
       ypos_mosaic          => linecounter_mosaic_bg,
       mapbase              => unsigned(REG_BG1CNT_Screen_Base_Block),
@@ -775,6 +785,8 @@ begin
       clk100               => clk100,
       drawline             => drawline_mode0_2,
       busy                 => busy_mode0_2,
+      lockspeed            => lockspeed,
+      pixelpos             => pixelpos,
       ypos                 => linecounter_int,
       ypos_mosaic          => linecounter_mosaic_bg,
       mapbase              => unsigned(REG_BG2CNT_Screen_Base_Block),
@@ -802,6 +814,8 @@ begin
       clk100               => clk100,
       drawline             => drawline_mode0_3,
       busy                 => busy_mode0_3,
+      lockspeed            => lockspeed,
+      pixelpos             => pixelpos,
       ypos                 => linecounter_int,
       ypos_mosaic          => linecounter_mosaic_bg,
       mapbase              => unsigned(REG_BG3CNT_Screen_Base_Block),
@@ -827,6 +841,7 @@ begin
    port map
    (
       clk100               => clk100,
+      line_trigger         => line_trigger,
       drawline             => drawline_mode2_2,
       busy                 => busy_mode2_2,
       mapbase              => unsigned(REG_BG2CNT_Screen_Base_Block),
@@ -856,6 +871,7 @@ begin
    port map
    (
       clk100               => clk100,
+      line_trigger         => line_trigger,
       drawline             => drawline_mode2_3,
       busy                 => busy_mode2_3,
       mapbase              => unsigned(REG_BG3CNT_Screen_Base_Block),
@@ -885,9 +901,10 @@ begin
    port map
    (
       clk100               => clk100,
+      BG_Mode              => BG_Mode,
+      line_trigger         => line_trigger,
       drawline             => drawline_mode345,
       busy                 => busy_mode345,
-      BG_Mode              => BG_Mode,
       second_frame         => REG_DISPCNT_Display_Frame_Select(REG_DISPCNT_Display_Frame_Select'left),
       mosaic               => REG_BG2CNT_Mosaic(REG_BG2CNT_Mosaic'left),
       Mosaic_H_Size        => unsigned(REG_MOSAIC_BG_Mosaic_H_Size),
@@ -996,7 +1013,7 @@ begin
          end if;
 
          if (PALETTE_BG_addr = 0 and PALETTE_BG_we(1) = '1') then
-            pixeldata_back <= PALETTE_BG_datain(15 downto 0);
+            pixeldata_back_next <= PALETTE_BG_datain(15 downto 0);
          end if;
       
          PALETTE_BG_Drawer_cnt <= PALETTE_BG_Drawer_cnt + 1;
@@ -1256,14 +1273,22 @@ begin
          end if;
          -- synthesis translate_on
          
-         if (drawline = '1') then
-            if (Screen_Display_BG0(Screen_Display_BG0'left) = '0') then on_delay_bg0 <= (others => '0'); else on_delay_bg0 <= on_delay_bg0(1 downto 0) & '1'; end if;
-            if (Screen_Display_BG1(Screen_Display_BG1'left) = '0') then on_delay_bg1 <= (others => '0'); else on_delay_bg1 <= on_delay_bg1(1 downto 0) & '1'; end if;
-            if (Screen_Display_BG2(Screen_Display_BG2'left) = '0') then on_delay_bg2 <= (others => '0'); else on_delay_bg2 <= on_delay_bg2(1 downto 0) & '1'; end if;
-            if (Screen_Display_BG3(Screen_Display_BG3'left) = '0') then on_delay_bg3 <= (others => '0'); else on_delay_bg3 <= on_delay_bg3(1 downto 0) & '1'; end if;
+         if (hblank_trigger = '1') then
+            if (Screen_Display_BG0(Screen_Display_BG0'left) = '0') then on_delay_bg0 <= (others => '0'); end if;
+            if (Screen_Display_BG1(Screen_Display_BG1'left) = '0') then on_delay_bg1 <= (others => '0'); end if;
+            if (Screen_Display_BG2(Screen_Display_BG2'left) = '0') then on_delay_bg2 <= (others => '0'); end if;
+            if (Screen_Display_BG3(Screen_Display_BG3'left) = '0') then on_delay_bg3 <= (others => '0'); end if;
          end if;
          
-         drawline_1 <= drawline;
+         if (drawline = '1' or newline_invsync = '1') then
+            if (Screen_Display_BG0(Screen_Display_BG0'left) = '1') then on_delay_bg0 <= on_delay_bg0(1 downto 0) & '1'; end if;
+            if (Screen_Display_BG1(Screen_Display_BG1'left) = '1') then on_delay_bg1 <= on_delay_bg1(1 downto 0) & '1'; end if;
+            if (Screen_Display_BG2(Screen_Display_BG2'left) = '1') then on_delay_bg2 <= on_delay_bg2(1 downto 0) & '1'; end if;
+            if (Screen_Display_BG3(Screen_Display_BG3'left) = '1') then on_delay_bg3 <= on_delay_bg3(1 downto 0) & '1'; end if;
+         end if;
+         
+         drawline_1       <= drawline;
+         hblank_trigger_1 <= hblank_trigger;
          start_draw <= '0';
          
          if (vblank_trigger = '1') then
@@ -1280,7 +1305,7 @@ begin
                if (drawline_1 = '1' and linesDrawn < 160) then
                   linesDrawn <= linesDrawn + 1;
                   if (nextLineDrawn = '0') then
-                     drawstate       <= WAITDRAW;
+                     drawstate       <= WAITHBLANK;
                      start_draw      <= '1';
                      linecounter_int <= to_integer(linecounter);
                      lineUpToDate(to_integer(linecounter)) <= '1';
@@ -1288,14 +1313,9 @@ begin
                   end if;
                end if;
                
-            when WAITDRAW =>
-               if (draw_allmod /= x"00") then
+            when WAITHBLANK =>
+               if (hblank_trigger = '1') then
                   drawstate <= DRAWING;
-               else
-                  drawstate        <= MERGING;
-                  linebuffer_addr  <= 0;
-                  merge_enable     <= '1';
-                  clear_trigger    <= '1';
                end if;
 
             when DRAWING =>
@@ -1373,49 +1393,56 @@ begin
       clk100               => clk100,                
                            
       enable               => merge_enable_1,                     
+      hblank               => hblank_trigger_1,   -- delayed 1 cycle because background is switched off at hblank                  
       xpos                 => linebuffer_addr_1,
       ypos                 => linecounter_int,
       
-      WND0_on              => REG_DISPCNT_Window_0_Display_Flag(REG_DISPCNT_Window_0_Display_Flag'left),
-      WND1_on              => REG_DISPCNT_Window_1_Display_Flag(REG_DISPCNT_Window_1_Display_Flag'left),
-      WNDOBJ_on            => REG_DISPCNT_OBJ_Wnd_Display_Flag(REG_DISPCNT_OBJ_Wnd_Display_Flag'left),
-                           
-      WND0_X1              => unsigned(REG_WIN0H_X1),
-      WND0_X2              => unsigned(REG_WIN0H_X2),
-      WND0_Y1              => unsigned(REG_WIN0V_Y1),
-      WND0_Y2              => unsigned(REG_WIN0V_Y2),
-      WND1_X1              => unsigned(REG_WIN1H_X1),
-      WND1_X2              => unsigned(REG_WIN1H_X2),
-      WND1_Y1              => unsigned(REG_WIN1V_Y1),
-      WND1_Y2              => unsigned(REG_WIN1V_Y2),
-                           
-      enables_wnd0         => enables_wnd0,  
-      enables_wnd1         => enables_wnd1,  
-      enables_wndobj       => enables_wndobj,
-      enables_wndout       => enables_wndout,
-                            
-      special_effect_in    => unsigned(REG_BLDCNT_Color_Special_Effect),
-      effect_1st_bg0       => REG_BLDCNT_BG0_1st_Target_Pixel(REG_BLDCNT_BG0_1st_Target_Pixel'left),
-      effect_1st_bg1       => REG_BLDCNT_BG1_1st_Target_Pixel(REG_BLDCNT_BG1_1st_Target_Pixel'left),
-      effect_1st_bg2       => REG_BLDCNT_BG2_1st_Target_Pixel(REG_BLDCNT_BG2_1st_Target_Pixel'left),
-      effect_1st_bg3       => REG_BLDCNT_BG3_1st_Target_Pixel(REG_BLDCNT_BG3_1st_Target_Pixel'left),
-      effect_1st_obj       => REG_BLDCNT_OBJ_1st_Target_Pixel(REG_BLDCNT_OBJ_1st_Target_Pixel'left),
-      effect_1st_BD        => REG_BLDCNT_BD_1st_Target_Pixel(REG_BLDCNT_BD_1st_Target_Pixel'left),
-      effect_2nd_bg0       => REG_BLDCNT_BG0_2nd_Target_Pixel(REG_BLDCNT_BG0_2nd_Target_Pixel'left),
-      effect_2nd_bg1       => REG_BLDCNT_BG1_2nd_Target_Pixel(REG_BLDCNT_BG1_2nd_Target_Pixel'left),
-      effect_2nd_bg2       => REG_BLDCNT_BG2_2nd_Target_Pixel(REG_BLDCNT_BG2_2nd_Target_Pixel'left),
-      effect_2nd_bg3       => REG_BLDCNT_BG3_2nd_Target_Pixel(REG_BLDCNT_BG3_2nd_Target_Pixel'left),
-      effect_2nd_obj       => REG_BLDCNT_OBJ_2nd_Target_Pixel(REG_BLDCNT_OBJ_2nd_Target_Pixel'left),
-      effect_2nd_BD        => REG_BLDCNT_BD_2nd_Target_Pixel(REG_BLDCNT_BD_2nd_Target_Pixel'left),
-                            
-      Prio_BG0             => unsigned(REG_BG0CNT_BG_Priority),
-      Prio_BG1             => unsigned(REG_BG1CNT_BG_Priority),
-      Prio_BG2             => unsigned(REG_BG2CNT_BG_Priority),
-      Prio_BG3             => unsigned(REG_BG3CNT_BG_Priority),
-                            
-      EVA                  => unsigned(REG_BLDALPHA_EVA_Coefficient),
-      EVB                  => unsigned(REG_BLDALPHA_EVB_Coefficient),
-      BLDY                 => unsigned(REG_BLDY),
+      in_WND0_on           => REG_DISPCNT_Window_0_Display_Flag(REG_DISPCNT_Window_0_Display_Flag'left),
+      in_WND1_on           => REG_DISPCNT_Window_1_Display_Flag(REG_DISPCNT_Window_1_Display_Flag'left),
+      in_WNDOBJ_on         => REG_DISPCNT_OBJ_Wnd_Display_Flag(REG_DISPCNT_OBJ_Wnd_Display_Flag'left),
+                        
+      in_WND0_X1           => unsigned(REG_WIN0H_X1),
+      in_WND0_X2           => unsigned(REG_WIN0H_X2),
+      in_WND0_Y1           => unsigned(REG_WIN0V_Y1),
+      in_WND0_Y2           => unsigned(REG_WIN0V_Y2),
+      in_WND1_X1           => unsigned(REG_WIN1H_X1),
+      in_WND1_X2           => unsigned(REG_WIN1H_X2),
+      in_WND1_Y1           => unsigned(REG_WIN1V_Y1),
+      in_WND1_Y2           => unsigned(REG_WIN1V_Y2),
+                 
+      in_enables_wnd0      => enables_wnd0,  
+      in_enables_wnd1      => enables_wnd1,  
+      in_enables_wndobj    => enables_wndobj,
+      in_enables_wndout    => enables_wndout,
+                  
+      in_special_effect_in => unsigned(REG_BLDCNT_Color_Special_Effect),
+      in_effect_1st_bg0    => REG_BLDCNT_BG0_1st_Target_Pixel(REG_BLDCNT_BG0_1st_Target_Pixel'left),
+      in_effect_1st_bg1    => REG_BLDCNT_BG1_1st_Target_Pixel(REG_BLDCNT_BG1_1st_Target_Pixel'left),
+      in_effect_1st_bg2    => REG_BLDCNT_BG2_1st_Target_Pixel(REG_BLDCNT_BG2_1st_Target_Pixel'left),
+      in_effect_1st_bg3    => REG_BLDCNT_BG3_1st_Target_Pixel(REG_BLDCNT_BG3_1st_Target_Pixel'left),
+      in_effect_1st_obj    => REG_BLDCNT_OBJ_1st_Target_Pixel(REG_BLDCNT_OBJ_1st_Target_Pixel'left),
+      in_effect_1st_BD     => REG_BLDCNT_BD_1st_Target_Pixel(REG_BLDCNT_BD_1st_Target_Pixel'left),
+      in_effect_2nd_bg0    => REG_BLDCNT_BG0_2nd_Target_Pixel(REG_BLDCNT_BG0_2nd_Target_Pixel'left),
+      in_effect_2nd_bg1    => REG_BLDCNT_BG1_2nd_Target_Pixel(REG_BLDCNT_BG1_2nd_Target_Pixel'left),
+      in_effect_2nd_bg2    => REG_BLDCNT_BG2_2nd_Target_Pixel(REG_BLDCNT_BG2_2nd_Target_Pixel'left),
+      in_effect_2nd_bg3    => REG_BLDCNT_BG3_2nd_Target_Pixel(REG_BLDCNT_BG3_2nd_Target_Pixel'left),
+      in_effect_2nd_obj    => REG_BLDCNT_OBJ_2nd_Target_Pixel(REG_BLDCNT_OBJ_2nd_Target_Pixel'left),
+      in_effect_2nd_BD     => REG_BLDCNT_BD_2nd_Target_Pixel(REG_BLDCNT_BD_2nd_Target_Pixel'left),
+                  
+      in_Prio_BG0          => unsigned(REG_BG0CNT_BG_Priority),
+      in_Prio_BG1          => unsigned(REG_BG1CNT_BG_Priority),
+      in_Prio_BG2          => unsigned(REG_BG2CNT_BG_Priority),
+      in_Prio_BG3          => unsigned(REG_BG3CNT_BG_Priority),
+                         
+      in_EVA               => unsigned(REG_BLDALPHA_EVA_Coefficient),
+      in_EVB               => unsigned(REG_BLDALPHA_EVB_Coefficient),
+      in_BLDY              => unsigned(REG_BLDY),
+      
+      in_ena_bg0           => on_delay_bg0(2),
+      in_ena_bg1           => on_delay_bg1(2),
+      in_ena_bg2           => on_delay_bg2(2),
+      in_ena_bg3           => on_delay_bg3(2),
+      in_ena_obj           => Screen_Display_OBJ(Screen_Display_OBJ'left),
                            
       pixeldata_bg0        => linebuffer_bg0_data,
       pixeldata_bg1        => linebuffer_bg1_data,
@@ -1442,11 +1469,14 @@ begin
          if (refpoint_update = '1' or ref3_y_written = '1') then ref3_y <= signed(REG_BG3RefY); mosaic_ref3_y <= signed(REG_BG3RefY); end if;
 
          if (hblank_trigger = '1') then
-            if (BG_Mode /= "000" and Screen_Display_BG2 = "1") then
+         
+            pixeldata_back <= pixeldata_back_next;
+         
+            if (BG_Mode /= "000" and on_delay_bg2(2) = '1') then
                ref2_x <= ref2_x + signed(REG_BG2RotScaleParDMX);
                ref2_y <= ref2_y + signed(REG_BG2RotScaleParDMY);
             end if;
-            if (BG_Mode = "010" and Screen_Display_BG3 = "1") then
+            if (BG_Mode = "010" and on_delay_bg3(2) = '1') then
                ref3_x <= ref3_x + signed(REG_BG3RotScaleParDMX);
                ref3_y <= ref3_y + signed(REG_BG3RotScaleParDMY);
             end if;
