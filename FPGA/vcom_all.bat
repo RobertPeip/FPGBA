@@ -43,7 +43,8 @@ src/gba/gba_drawer_mode345.vhd ^
 src/gba/gba_drawer_obj.vhd ^
 src/gba/gba_drawer_merge.vhd ^
 src/gba/gba_gpu_drawer.vhd ^
-src/gba/gba_gpu.vhd
+src/gba/gba_gpu.vhd ^
+src/gba/gba_gpioRTCSolarGyro.vhd
 
 vcom -2008 -quiet -work sim/gba ^
 src/gba/gba_cpu.vhd ^

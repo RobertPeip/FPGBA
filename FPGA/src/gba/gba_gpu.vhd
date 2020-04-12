@@ -55,6 +55,7 @@ entity gba_gpu is
       VRAM_Hi_dataout      : out   std_logic_vector(31 downto 0);
       VRAM_Hi_we           : in    std_logic;
       VRAM_Hi_be           : in    std_logic_vector(3 downto 0);
+      vram_blocked         : out   std_logic;
                            
       OAMRAM_PROC_addr     : in    integer range 0 to 255;
       OAMRAM_PROC_datain   : in    std_logic_vector(31 downto 0);
@@ -90,7 +91,8 @@ architecture arch of gba_gpu is
    signal pixel_data           : std_logic_vector(14 downto 0);  
    signal pixel_we             : std_logic := '0';
 
-   
+
+   signal vram_block_mode      : std_logic;
 begin 
 
    igba_gpu_timing : entity work.gba_gpu_timing
@@ -115,6 +117,9 @@ begin
       IRP_HBlank                   => IRP_HBlank,
       IRP_VBlank                   => IRP_VBlank, 
       IRP_LCDStat                  => IRP_LCDStat,
+      
+      vram_block_mode              => vram_block_mode,
+      vram_blocked                 => vram_blocked,  
            
       line_trigger                 => line_trigger,
       hblank_trigger               => hblank_trigger,                            
@@ -144,6 +149,7 @@ begin
       maxpixels              => maxpixels,
       
       bitmapdrawmode         => bitmapdrawmode,
+      vram_block_mode        => vram_block_mode,
       
       pixel_out_x            => pixel_x,   
       pixel_out_y            => pixel_y,   
@@ -205,6 +211,35 @@ begin
       pixel_out_data       => pixel_out_data,
       pixel_out_we         => pixel_out_we  
    );
+
+--   igba_gpu_overlay : entity work.gba_gpu_overlay
+--   generic map 
+--   (
+--      COLS                   => 2,
+--      LINES                  => 1,
+--      RGB_BACK               => (17 downto 0 => '0'),
+--      RGB_FRONT              => (17 downto 0 => '1')
+--   )
+--   port map
+--   (
+--      clk                    => clk100,
+--      ena                    => '0',
+--                             
+--      i_pixel_out_x          => pixel_shade_x,   
+--      i_pixel_out_y          => pixel_shade_y,  
+--      i_pixel_out_addr       => pixel_shade_addr,
+--      i_pixel_out_data       => pixel_shade_data,
+--      i_pixel_out_we         => pixel_shade_we,  
+--                             
+--      o_pixel_out_x          => pixel_out_x,   
+--      o_pixel_out_y          => pixel_out_y,  
+--      o_pixel_out_addr       => pixel_out_addr,
+--      o_pixel_out_data       => pixel_out_data,
+--      o_pixel_out_we         => pixel_out_we,  
+--                             
+--      in0                    => fps,
+--      in1                    => x"00"
+--   );
 
 end architecture;
 

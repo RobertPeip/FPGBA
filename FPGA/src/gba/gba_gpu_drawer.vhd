@@ -23,12 +23,15 @@ entity gba_gpu_drawer is
       maxpixels            : in    std_logic;
       
       bitmapdrawmode       : out   std_logic;
+      vram_block_mode      : out   std_logic;
         
       pixel_out_x          : out   integer range 0 to 239;
       pixel_out_y          : out   integer range 0 to 159;
       pixel_out_addr       : out   integer range 0 to 38399;
       pixel_out_data       : out   std_logic_vector(14 downto 0);  
       pixel_out_we         : out   std_logic := '0';
+      
+      fps_out              : out   unsigned(7 downto 0) := x"60";
                            
       linecounter          : in    unsigned(7 downto 0);
       pixelpos             : in    integer range 0 to 511;
@@ -418,6 +421,11 @@ architecture arch of gba_gpu_drawer is
    signal PixelArraySmooth : tPixelArray := (others => (others => '0'));
    
    signal pixel_smooth : std_logic_vector(14 downto 0);
+   
+   -- debugging
+   signal fps              : unsigned(7 downto 0) := (others => '0');
+   signal framecount       : integer range 0 to 59 := 0;
+   signal frameselect_last : std_logic := '0';
    
 begin 
    
@@ -934,6 +942,7 @@ begin
       clk100               => clk100,
       
       hblank               => hblank_trigger,
+      lockspeed            => lockspeed,
       busy                 => busy_modeobj,
       
       drawline             => drawline_obj,
@@ -1010,6 +1019,11 @@ begin
          bitmapdrawmode <= '0';
          if (unsigned(BG_Mode) >= 3) then
             bitmapdrawmode <= '1';
+         end if;
+         
+         vram_block_mode <= '0';
+         if (unsigned(BG_Mode) = 2 and on_delay_bg2(2) = '1' and on_delay_bg3(2) = '1') then
+            vram_block_mode <= '1';    
          end if;
 
          if (PALETTE_BG_addr = 0 and PALETTE_BG_we(1) = '1') then
@@ -1291,19 +1305,22 @@ begin
          hblank_trigger_1 <= hblank_trigger;
          start_draw <= '0';
          
+         -- count and track if all lines have been drawn for fastforward mode
          if (vblank_trigger = '1') then
             if (linesDrawn = 160) then
                lineUpToDate <= (others => '0');
             end if;
             linesDrawn      <= 0;
          end if;  
+         if (drawline_1 = '1' and linesDrawn < 160 and (drawstate = IDLE or nextLineDrawn = '1')) then
+            linesDrawn <= linesDrawn + 1;
+         end if;
          
          clear_trigger <= '0';
 
          case (drawstate) is
             when IDLE =>
                if (drawline_1 = '1' and linesDrawn < 160) then
-                  linesDrawn <= linesDrawn + 1;
                   if (nextLineDrawn = '0') then
                      drawstate       <= WAITHBLANK;
                      start_draw      <= '1';
@@ -1487,6 +1504,31 @@ begin
             mosaik_vcnt_obj        <= 0;
             linecounter_mosaic_bg  <= 0;
             linecounter_mosaic_obj <= 0;
+            
+            -- count fps for debugging
+            frameselect_last <= REG_DISPCNT_Display_Frame_Select(REG_DISPCNT_Display_Frame_Select'left);
+            if (framecount = 59) then
+               fps_out         <= fps;
+               framecount      <= 0;
+               fps(7 downto 4) <= x"0";
+               if (BG_Mode(2) = '0' or REG_DISPCNT_Display_Frame_Select(REG_DISPCNT_Display_Frame_Select'left) /= frameselect_last) then
+                  fps(3 downto 0) <= x"1";   
+               else
+                  fps(3 downto 0) <= x"0";
+               end if;
+            else 
+               framecount <= framecount + 1;
+               if (BG_Mode(2) = '0' or REG_DISPCNT_Display_Frame_Select(REG_DISPCNT_Display_Frame_Select'left) /= frameselect_last) then
+                  if (fps(3 downto 0) = 9) then
+                     fps(3 downto 0) <= x"0";
+                     fps(7 downto 4) <= fps(7 downto 4) + 1;
+                  else
+                     fps(3 downto 0) <= fps(3 downto 0) + 1;
+                  end if;
+               end if;
+            end if;
+            
+            
          elsif (drawline = '1') then
          
             -- background

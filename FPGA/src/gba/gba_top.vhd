@@ -37,9 +37,20 @@ entity gba_top is
       maxpixels          : in     std_logic;                    -- limit pixels per line
       shade_mode         : in     std_logic_vector(2 downto 0); -- 0 = off, 1..4 modes
       specialmodule      : in     std_logic;                    -- 0 = off, 1 = use gamepak GPIO Port at address 0x080000C4..0x080000C8
+      solar_in           : in     std_logic_vector(2 downto 0);
+      tilt               : in     std_logic;                    -- 0 = off, 1 = use tilt at address 0x0E008200, 0x0E008300, 0x0E008400, 0x0E008500
       rewind_on          : in     std_logic;
       rewind_active      : in     std_logic;
       savestate_number   : in     integer;
+      -- RTC
+      RTC_timestampNew   : in     std_logic;                     -- new current timestamp from system
+      RTC_timestampIn    : in     std_logic_vector(31 downto 0); -- timestamp in seconds, current time
+      RTC_timestampSaved : in     std_logic_vector(31 downto 0); -- timestamp in seconds, saved time
+      RTC_savedtimeIn    : in     std_logic_vector(41 downto 0); -- time structure, loaded
+      RTC_saveLoaded     : in     std_logic;                     -- must be 0 when loading new game, should go and stay 1 when RTC was loaded and values are valid
+      RTC_timestampOut   : out    std_logic_vector(31 downto 0); -- timestamp to be saved
+      RTC_savedtimeOut   : out    std_logic_vector(41 downto 0); -- time structure to be saved
+      RTC_inuse          : out    std_logic := '0';              -- will indicate that RTC is in use and should be saved on next saving
       -- cheats
       cheat_clear        : in     std_logic;
       cheats_enabled     : in     std_logic;
@@ -60,13 +71,19 @@ entity gba_top is
       bus_out_ena        : out    std_logic;                     -- one cycle high for each action
       bus_out_done       : in     std_logic;                     -- should be one cycle high when write is done or read value is valid
       -- savestate           
-      SAVE_out_Din       : out    std_logic_vector(63 downto 0); -- data read from savestate
-      SAVE_out_Dout      : in     std_logic_vector(63 downto 0); -- data written to savestate
+      SAVE_out_Din       : out    std_logic_vector(31 downto 0); -- data read from savestate
+      SAVE_out_Dout      : in     std_logic_vector(31 downto 0); -- data written to savestate
       SAVE_out_Adr       : out    std_logic_vector(25 downto 0); -- all addresses are DWORD addresses!
       SAVE_out_rnw       : out    std_logic;                     -- read = 1, write = 0
       SAVE_out_ena       : out    std_logic;                     -- one cycle high for each action
       SAVE_out_active    : out    std_logic;                     -- is high when access goes to savestate
       SAVE_out_done      : in     std_logic;                     -- should be one cycle high when write is done or read value is valid
+      -- copy
+      Copy_request_start : out   std_logic;
+      Copy_request_src   : out   std_logic_vector(24 downto 0);
+      Copy_request_dst   : out   std_logic_vector(24 downto 0);
+      Copy_request_len   : out   std_logic_vector(24 downto 0);
+      Copy_request_done  : in    std_logic;
       -- Write to BIOS
       bios_wraddr        : in     std_logic_vector(11 downto 0) := (others => '0');
       bios_wrdata        : in     std_logic_vector(31 downto 0) := (others => '0');
@@ -87,6 +104,8 @@ entity gba_top is
       KeyDown            : in     std_logic;
       KeyR               : in     std_logic;
       KeyL               : in     std_logic;
+      AnalogTiltX        : in     signed(7 downto 0);
+      AnalogTiltY        : in     signed(7 downto 0);
       -- debug interface          
       GBA_BusAddr        : in     std_logic_vector(27 downto 0);
       GBA_BusRnW         : in     std_logic;
@@ -200,6 +219,8 @@ architecture arch of gba_top is
    signal VRAM_Hi_dataout      : std_logic_vector(31 downto 0);
    signal VRAM_Hi_we           : std_logic;
    signal VRAM_Hi_be           : std_logic_vector(3 downto 0);
+   signal vram_blocked         : std_logic;
+   signal vram_cycle           : std_logic;
                                
    signal OAMRAM_PROC_addr     : integer range 0 to 255;
    signal OAMRAM_PROC_datain   : std_logic_vector(31 downto 0);
@@ -455,7 +476,13 @@ begin
       bus_out_rnw         => SAVE_out_rnw,   
       bus_out_ena         => SAVE_out_ena,   
       bus_out_active      => SAVE_out_active,
-      bus_out_done        => SAVE_out_done  
+      bus_out_done        => SAVE_out_done,
+
+      Copy_request_start  => Copy_request_start,
+      Copy_request_src    => Copy_request_src,  
+      Copy_request_dst    => Copy_request_dst,  
+      Copy_request_len    => Copy_request_len,  
+      Copy_request_done   => Copy_request_done       
    );
    
    igba_statemanager : entity work.gba_statemanager
@@ -511,17 +538,34 @@ begin
       BusDone        => mem_bus_done
    );
    
-   igba_gpiodummy : entity work.gba_gpiodummy
+   igba_gpioRTCSolarGyro : entity work.gba_gpioRTCSolarGyro
    port map
    (
-      clk100               => clk100,       
-                                           
+      clk100               => clk100, 
+      reset                => reset,
+      GBA_on               => GBA_on,
+                                         
+      savestate_bus        => savestate_bus,
+                                         
       GPIO_readEna         => GPIO_readEna, 
       GPIO_done            => GPIO_done,   
       GPIO_Din             => GPIO_Din,     
       GPIO_Dout            => GPIO_Dout,    
       GPIO_writeEna        => GPIO_writeEna,
-      GPIO_addr            => GPIO_addr    
+      GPIO_addr            => GPIO_addr,
+      
+      vblank_trigger       => vblank_trigger,
+      RTC_timestampNew     => RTC_timestampNew,
+      RTC_timestampIn      => RTC_timestampIn,   
+      RTC_timestampSaved   => RTC_timestampSaved,
+      RTC_savedtimeIn      => RTC_savedtimeIn,   
+      RTC_saveLoaded       => RTC_saveLoaded,    
+      RTC_timestampOut     => RTC_timestampOut,  
+      RTC_savedtimeOut     => RTC_savedtimeOut,  
+      RTC_inuse            => RTC_inuse,         
+      
+      AnalogX              => AnalogTiltX,
+      solar_in             => solar_in
    );
    
    process (clk100)
@@ -616,7 +660,9 @@ begin
       VRAM_Hi_datain       => VRAM_Hi_datain, 
       VRAM_Hi_dataout      => VRAM_Hi_dataout,
       VRAM_Hi_we           => VRAM_Hi_we,     
-      VRAM_Hi_be           => VRAM_Hi_be,     
+      VRAM_Hi_be           => VRAM_Hi_be, 
+      vram_blocked         => vram_blocked,    
+      vram_cycle           => vram_cycle,
 
       OAMRAM_PROC_addr     => OAMRAM_PROC_addr,   
       OAMRAM_PROC_datain   => OAMRAM_PROC_datain, 
@@ -639,6 +685,10 @@ begin
       GPIO_Dout            => GPIO_Dout,    
       GPIO_writeEna        => GPIO_writeEna,
       GPIO_addr            => GPIO_addr,    
+      
+      tilt                 => tilt,       
+      AnalogTiltX          => AnalogTiltX,
+      AnalogTiltY          => AnalogTiltY,
 
       debug_mem            => debug_mem      
    );
@@ -760,7 +810,8 @@ begin
       VRAM_Hi_datain       => VRAM_Hi_datain, 
       VRAM_Hi_dataout      => VRAM_Hi_dataout,
       VRAM_Hi_we           => VRAM_Hi_we,        
-      VRAM_Hi_be           => VRAM_Hi_be,        
+      VRAM_Hi_be           => VRAM_Hi_be,  
+      vram_blocked         => vram_blocked,        
                          
       OAMRAM_PROC_addr     => OAMRAM_PROC_addr,   
       OAMRAM_PROC_datain   => OAMRAM_PROC_datain, 
@@ -867,8 +918,8 @@ begin
       debug_cpu_mixed  => debug_cpu_mixed
    );
    
-   new_cycles       <= x"01"           when GBA_cputurbo = '1' or DEBUG_NOCPU = '1' else new_cycles_cpu      ;
-   new_cycles_valid <= new_exact_cycle when GBA_cputurbo = '1' or DEBUG_NOCPU = '1' else new_cycles_valid_cpu;
+   new_cycles       <= x"01"           when GBA_cputurbo = '1' or DEBUG_NOCPU = '1' or vram_cycle = '1' else new_cycles_cpu      ;
+   new_cycles_valid <= new_exact_cycle when GBA_cputurbo = '1' or DEBUG_NOCPU = '1' or vram_cycle = '1' else new_cycles_valid_cpu;
    
    iREG_IRP_IE  : entity work.eProcReg_gba generic map (work.pReg_gba_system.IRP_IE ) port map  (clk100, gb_bus, REG_IRP_IE , REG_IRP_IE );
    iREG_IRP_IF  : entity work.eProcReg_gba generic map (work.pReg_gba_system.IRP_IF ) port map  (clk100, gb_bus, IRPFLags   , REG_IRP_IF , IF_written);                                                                                                                   
@@ -879,8 +930,6 @@ begin
    iREG_HALTCNT : entity work.eProcReg_gba generic map (work.pReg_gba_system.HALTCNT) port map  (clk100, gb_bus, (REG_HALTCNT'range => '0'), REG_HALTCNT, REG_HALTCNT_written);
 
    iSAVESTATE_IRP   : entity work.eProcReg_gba generic map (REG_SAVESTATE_IRP  ) port map (clk100, savestate_bus, IRPFLags , SAVESTATE_IRP);
-   
-   iSAVESTATE_DUMMY : entity work.eProcReg_gba generic map (REG_SAVESTATE_DUMMY) port map (clk100, savestate_bus, "0" , open);
 
    debug_irq(15 downto 0) <= IRPFLags;
    debug_irq(16) <= REG_IME(0);
