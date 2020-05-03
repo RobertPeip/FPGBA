@@ -24,8 +24,8 @@ Out of scope:
 
 # Target Boards
 1. Terasic DE2-115 (done)
-2. Terasic DE-10(Mister) (done)
-3. Nexys Video
+2. Terasic DE-10 Nano(Mister) (done)
+3. Nexys Video (done)
 4. Analogue Pocket(if jailbreak possible) - future work
 
 # Status: 
@@ -112,6 +112,59 @@ The BIOS is NOT provided in the repo obviously. Instead there is a script to con
 You need to provide the BIOS yourself or use the one checked in, which is opensource. 
 However, this opensource-BIOS will crash in the test, so it's unsure how good it is.
 All credit goes to Normmatt.
+
+# How to Build
+
+## Terasic DE2-115
+
+- Use the files checked in and put them into a Quartus 18.1 project
+- Connect your own SDRAM(Gamepak) and SDRAM/SRAM/Blockram interface for the other RAMs
+- Connect your video and sound output to the ports
+- Provide some way of input
+- If you need assistance with some parts, contact me
+
+- Help for Audio: https://github.com/AntonZero/WM8731-Audio-codec-on-DE10Standard-FPGA-board 
+- Help for SDRam: https://github.com/bonfireprocessor/bonfire-soc/blob/master/sdram/SDRAM_Controller.vhd
+- Help for Video: seriously, there are thousands of VGA cores
+
+## Terasic DE-10 Nano
+
+See 
+https://github.com/MiSTer-devel/GBA_MiSTer
+
+
+## Nexys Video
+
+- Use the files checked in and put them into a Vivado 2019.2 project
+- Replace some files with the ones in the nexysvideo folder (see below)
+- Instantiate a MIG7 native DDR3 interface and connect ALL Memory Busses to it (that works, as they never access at the same time)
+- Connect your video and sound output to the ports
+- Provide some way of input
+- If you need assistance with some parts, contact me
+
+- Help for Video: https://github.com/fcayci/vhdl-hdmi-out
+- Help for Audio: https://github.com/Digilent/NexysVideo/tree/master/Projects/Looper
+
+
+Thanks to Xilinx bad synthesis and optimizations tools, some files need to be changed. Reasons:
+
+- Vivado doesn't like Dualport Memories within a single process. 
+While this is completly correct and the only way to simulate the memory, 
+they just state that you have written it that way, but they don't give you Blockram until you rewrite your code so it's no longer valid VHDL,
+as now the signal is driven from two processes instead of one.
+
+- When doing a mod by 256 or 512 on an Integer, that's just a nice way to write that I want to just take the last 8 or 9 bits.
+Having it convert to Signed/Unsigned, taking the bits, and convert back looks very ugly instead.
+However, Vivado decides to do a full division instead(on all 20 Bits) and fails the timing.
+
+- When multiplying by either 16, 32, 64 or 128, it should be obvious, that this is just a shift by either 4,5,6 or 7.
+Again Vidado instead wants to do a full multiplication at this point with DSP slices and fails the timing.
+
+- There is still a bug inside the 3rd soundchannel on some GBA Register, because Vivado just can't convert internal tristate busses to and/or combined logic correct.
+To do this properly, the tristate bus must be at least split from record to single signals, 
+as Vivado does detect tristate busses in records as multiple driver signals, which is nothing more than a bug.
+
+It is worth noting, that Altera/Intel gets all these things easily detected and optimized correct, so that the FPGA behaves like the simulation does.
 
 # Open Bugs/Features
 
